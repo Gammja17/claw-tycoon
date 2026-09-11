@@ -1,0 +1,69 @@
+// 게임 데이터 카탈로그
+export const START_MONEY = 30000;
+export const SAVE_KEY = 'claw-tycoon-save-v1';
+
+// 인형 종류 (희귀도 0~3)
+export const PLUSH_TYPES = {
+  bear:    { name:'곰돌이',   rarity:0, color:0xc98a4b, belly:0xf1d3a5, ear:'round',  size:1.0 },
+  bunny:   { name:'토끼',     rarity:0, color:0xf6f0f0, belly:0xffc7d6, ear:'long',   size:0.95 },
+  duck:    { name:'오리',     rarity:0, color:0xffd94a, belly:0xffe98c, ear:'none',   beak:true, size:0.85 },
+  cat:     { name:'고양이',   rarity:1, color:0x8f8f9a, belly:0xffffff, ear:'pointy', size:0.95 },
+  frog:    { name:'개구리',   rarity:1, color:0x6bc46a, belly:0xd8f3b0, ear:'none',   frogEyes:true, size:0.9 },
+  penguin: { name:'펭귄',     rarity:1, color:0x2f3742, belly:0xffffff, ear:'none',   beak:true, size:1.0 },
+  panda:   { name:'판다',     rarity:2, color:0xf5f5f5, belly:0xf5f5f5, ear:'round',  earColor:0x222222, patches:true, size:1.15 },
+  unicorn: { name:'유니콘',   rarity:2, color:0xf3e6ff, belly:0xffffff, ear:'pointy', horn:true, size:1.05 },
+  dragon:  { name:'아기용',   rarity:3, color:0x7b4dd6, belly:0xffd166, ear:'pointy', wings:true, size:1.2 },
+  goldbear:{ name:'황금곰',   rarity:3, color:0xffc321, belly:0xfff1b8, ear:'round',  size:1.3, shiny:true },
+};
+export const RARITY = [
+  { name:'일반', value:3000,  color:'#8fa3b1' },
+  { name:'고급', value:8000,  color:'#3fbf7f' },
+  { name:'희귀', value:20000, color:'#4f8cff' },
+  { name:'전설', value:60000, color:'#ff5fa2' },
+];
+export const RARITY_WEIGHT = [6, 3, 1.4, 0.5];
+
+// 집게 세팅 프리셋
+// grip: 집게 힘(상대값). 인형 하중은 대략 size^2 * 4 정도라 1.0 인형 ≈ 4
+// gripVar: 매판 랜덤 변동폭. pity: N판마다 1번 짱짱(0이면 없음). clawSize: 집게 크기 배율. spin: 회오리 회전
+export const GRIP_PRESETS = {
+  loose:  { label:'느슨함 (너무해)', grip:2.4, gripVar:0.9 },
+  normal: { label:'보통',           grip:3.6, gripVar:0.8 },
+  strong: { label:'짱짱함',         grip:6.5, gripVar:0.6 },
+};
+
+// 다른 가게들 (원정)
+export const SHOPS = [
+  { id:'stationery', name:'동네 문방구 뽑기', cost:500, desc:'집게가 너무 느슨하다. 입구 근처 인형을 밀어 넣거나 탑을 쌓는 게 답.',
+    grip:'loose', pity:0, clawSize:1.0, spin:false, pool:['bear','bunny','duck'], count:24, color:0xff8fab, w:1.5,d:1.1,h:1.3 },
+  { id:'station', name:'역전 뽑기샵', cost:1000, desc:'평소엔 느슨. 소문으로는 30판마다 한 번 꽉 잡아준다고... 카운터 표시 있음.',
+    grip:'loose', pity:30, clawSize:1.0, spin:false, pool:['bear','bunny','duck','cat','frog','penguin'], count:22, color:0x7cc6fe, w:1.6,d:1.2,h:1.4 },
+  { id:'tiny', name:'작은집게 오락실', cost:500, desc:'집게가 작다. 큰 인형은 아예 안 잡히고 작은 인형만 노려야 함.',
+    grip:'normal', pity:0, clawSize:0.65, spin:false, pool:['duck','bunny','bear','panda'], count:22, color:0xa0e7a0, w:1.5,d:1.1,h:1.3 },
+  { id:'tornado', name:'회오리 크레인', cost:1000, desc:'집게가 올라가면서 빙글빙글 돈다. 원심력에 인형이 날아간다. 방향을 잘 재면...',
+    grip:'normal', pity:0, clawSize:1.0, spin:true, pool:['cat','frog','penguin','unicorn'], count:20, color:0xb28dff, w:1.6,d:1.2,h:1.4 },
+  { id:'strong', name:'짱짱 프리미엄', cost:2000, desc:'집게가 짱짱하다. 대신 비싸고 인형이 크고 무겁다.',
+    grip:'strong', pity:0, clawSize:1.0, spin:false, pool:['panda','unicorn','penguin','dragon'], count:18, color:0xffb36b, w:1.7,d:1.3,h:1.5 },
+  { id:'legend', name:'전설의 황금기계', cost:5000, desc:'느슨한데 20판 피티가 있다는 소문. 황금곰이 산다.',
+    grip:'loose', pity:20, clawSize:1.1, spin:false, pool:['panda','unicorn','dragon','goldbear'], count:14, color:0xffd166, w:1.8,d:1.4,h:1.5 },
+];
+
+// 내 가게에서 살 수 있는 기계
+export const MY_MACHINES = [
+  { id:'small', name:'소형 크레인', price:40000,  capacity:8,  baseRate:3, color:0xffa4c4, w:1.3,d:1.0,h:1.2 },
+  { id:'mid',   name:'중형 크레인', price:120000, capacity:14, baseRate:5, color:0x8fd3ff, w:1.6,d:1.2,h:1.4 },
+  { id:'big',   name:'대형 크레인', price:350000, capacity:24, baseRate:8, color:0xffe08a, w:1.9,d:1.4,h:1.6 },
+];
+// 손님이 이길 확률(집게 세팅별)
+export const CUSTOMER_WINRATE = { loose:0.05, normal:0.13, strong:0.32 };
+export const SLOT_POS = [[-2.7,-1.7],[0,-1.7],[2.7,-1.7],[-2.7,1.1],[0,1.1],[2.7,1.1]];
+
+export function poolWeights(pool){
+  return pool.map(k => RARITY_WEIGHT[PLUSH_TYPES[k].rarity]);
+}
+export function pickWeighted(keys, weights){
+  let t = weights.reduce((a,b)=>a+b,0), r = Math.random()*t;
+  for (let i=0;i<keys.length;i++){ r -= weights[i]; if (r<=0) return keys[i]; }
+  return keys[keys.length-1];
+}
+export const won = n => Math.round(n).toLocaleString('ko-KR') + '원';

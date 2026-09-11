@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>인형뽑기 타이쿤</title>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root { --pink:#ff4f8b; --pink2:#ff8fab; --ink:#3b2a3a; --bg:#fff7fa; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#ffe9f0; font-family:'Jua', system-ui, sans-serif; color:var(--ink); }
+  canvas { display:block; }
+  #app { position:fixed; inset:0; }
+  .hidden { display:none !important; }
+  button { font-family:inherit; font-size:16px; border:0; border-radius:14px; padding:10px 16px; background:var(--pink); color:#fff; cursor:pointer; box-shadow:0 4px 0 #d13a70; transition:transform .05s; }
+  button:active { transform:translateY(3px); box-shadow:0 1px 0 #d13a70; }
+  button.ghost { background:#fff; color:var(--pink); box-shadow:0 4px 0 #e6c4d0; }
+  button.ghost:active { box-shadow:0 1px 0 #e6c4d0; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.sm { font-size:13px; padding:5px 10px; border-radius:10px; box-shadow:0 3px 0 #d13a70; }
+  .topbar { position:fixed; top:10px; left:10px; right:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; pointer-events:none; }
+  .topbar > * { pointer-events:auto; }
+  .chip { background:rgba(255,255,255,.92); border-radius:14px; padding:8px 14px; font-size:18px; box-shadow:0 3px 10px rgba(0,0,0,.12); }
+  .chip.money { color:#1f9d55; font-size:20px; }
+  .spacer { flex:1; }
+  .modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(560px, 94vw); max-height:88vh; overflow:auto; background:var(--bg); border-radius:22px; padding:18px 20px; box-shadow:0 20px 60px rgba(0,0,0,.25); z-index:20; }
+  .modal h2 { margin:0 0 8px; color:var(--pink); font-size:24px; }
+  .modal h3 { margin:14px 0 6px; font-size:17px; }
+  .modal .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  .modal .close { position:absolute; right:14px; top:12px; background:#eee; color:#666; box-shadow:0 3px 0 #ccc; padding:6px 12px; }
+  .backdrop { position:fixed; inset:0; background:rgba(60,20,40,.35); z-index:15; }
+  .list { display:flex; flex-direction:column; gap:6px; }
+  .item { display:flex; align-items:center; gap:10px; background:#fff; border-radius:14px; padding:8px 12px; box-shadow:0 2px 6px rgba(0,0,0,.06); }
+  .item .dot { width:22px; height:22px; border-radius:50%; flex:none; border:2px solid rgba(0,0,0,.1); }
+  .item .name { flex:1; font-size:16px; }
+  .item .sub { font-size:12px; color:#8a7a86; }
+  .tag { font-size:11px; padding:2px 7px; border-radius:8px; color:#fff; }
+  input[type=number] { font-family:inherit; font-size:18px; width:120px; padding:6px 10px; border-radius:10px; border:2px solid #f3c6d6; }
+  select { font-family:inherit; font-size:15px; padding:6px 10px; border-radius:10px; border:2px solid #f3c6d6; background:#fff; }
+  .hint { font-size:13px; color:#8a7a86; }
+  .stat { display:inline-block; background:#fff; border-radius:10px; padding:6px 10px; margin:2px; font-size:14px; }
+  /* 플레이 HUD */
+  #play-ui .bottombar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  #pu-timer { position:fixed; top:64px; left:50%; transform:translateX(-50%); width:min(420px, 80vw); height:14px; background:rgba(255,255,255,.7); border-radius:8px; overflow:hidden; }
+  #pu-timer-fill { height:100%; width:100%; background:linear-gradient(90deg,#ffd166,#ff4f8b); transition:width .1s linear; }
+  #pu-msg { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%); font-size:40px; color:#fff; text-shadow:0 3px 0 #d13a70, 0 6px 18px rgba(0,0,0,.3); pointer-events:none; opacity:0; transition:opacity .2s; text-align:center; }
+  #pu-msg.show { opacity:1; }
+  #pu-desc { position:fixed; top:90px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,.8); border-radius:12px; padding:6px 12px; font-size:13px; max-width:90vw; text-align:center; }
+  #dpad { position:fixed; left:18px; bottom:18px; display:grid; grid-template-columns:repeat(3, 56px); grid-template-rows:repeat(3, 56px); gap:4px; }
+  #dpad button { font-size:22px; padding:0; border-radius:12px; background:rgba(255,255,255,.9); color:var(--pink); box-shadow:0 3px 0 #e6c4d0; touch-action:none; user-select:none; }
+  #pu-drop { position:fixed; right:18px; bottom:18px; width:120px; height:120px; border-radius:50%; font-size:22px; background:#ffd400; color:#5a3a00; box-shadow:0 6px 0 #c9a600; }
+  #pu-drop:active { box-shadow:0 2px 0 #c9a600; }
+  #keys { position:fixed; bottom:206px; left:18px; font-size:12px; color:#7a5a6a; background:rgba(255,255,255,.7); border-radius:10px; padding:6px 10px; }
+  .float { position:fixed; transform:translate(-50%,-50%); font-size:20px; color:#1f9d55; text-shadow:0 2px 0 #fff, 0 0 8px #fff; pointer-events:none; animation:floatUp 1.6s ease-out forwards; white-space:nowrap; }
+  .float.win { color:var(--pink); font-size:22px; }
+  @keyframes floatUp { 0%{opacity:0; margin-top:10px} 15%{opacity:1} 100%{opacity:0; margin-top:-60px} }
+  #toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(59,42,58,.92); color:#fff; padding:10px 18px; border-radius:14px; font-size:16px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; }
+  #toast.show { opacity:1; }
+  .shop-card { background:#fff; border-radius:16px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,.08); display:flex; gap:10px; align-items:center; }
+  .shop-card .swatch { width:46px; height:46px; border-radius:12px; flex:none; }
+  .shop-card .body { flex:1; }
+  .shop-card .title { font-size:18px; }
+  .shop-card .desc { font-size:12px; color:#8a7a86; }
+  @media (max-width:640px){ .chip { font-size:14px; padding:6px 10px; } .chip.money { font-size:16px; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 가게 화면 UI -->
+<div id="store-ui">
+  <div class="topbar">
+    <div class="chip money" id="su-money">0원</div>
+    <div class="chip" id="su-info">기계 0대</div>
+    <div class="spacer"></div>
+    <button id="su-trip">🚌 원정 가기</button>
+    <button class="ghost" id="su-inv">📦 창고</button>
+    <button class="ghost" id="su-help">❓</button>
+  </div>
+</div>
+
+<!-- 플레이 화면 UI -->
+<div id="play-ui" class="hidden">
+  <div class="topbar">
+    <div class="chip money" id="pu-money">0원</div>
+    <div class="chip" id="pu-shop">가게</div>
+    <div class="chip" id="pu-credit">크레딧 0</div>
+    <div class="spacer"></div>
+    <button class="ghost" id="pu-cam">📷 시점</button>
+    <button class="ghost" id="pu-exit">🏠 내 가게로</button>
+  </div>
+  <div id="pu-desc"></div>
+  <div id="pu-timer"><div id="pu-timer-fill"></div></div>
+  <div id="pu-msg"></div>
+  <div class="bottombar">
+    <button id="pu-coin">💰 500원 넣기</button>
+    <button id="pu-start">▶ 시작</button>
+  </div>
+  <div id="keys">방향키/WASD 이동 · 스페이스 내리기 · C 시점</div>
+  <div id="dpad">
+    <span></span><button data-k="up">▲</button><span></span>
+    <button data-k="left">◀</button><span></span><button data-k="right">▶</button>
+    <span></span><button data-k="down">▼</button><span></span>
+  </div>
+  <button id="pu-drop">⬇ 내리기</button>
+</div>
+
+<div id="backdrop" class="backdrop hidden"></div>
+
+<!-- 원정 목록 -->
+<div id="m-trip" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>🚌 원정 가기</h2>
+  <div class="hint">다른 가게에서 내 돈으로 뽑아온 인형을 창고에 쌓고, 내 기계에 넣어 팔자.</div>
+  <div id="trip-list" class="list" style="margin-top:10px"></div>
+</div>
+
+<!-- 창고 -->
+<div id="m-inv" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>📦 창고</h2>
+  <div class="hint">직접 팔면 시세의 50%. 기계에 넣어두면 손님이 돈을 내고 뽑아간다.</div>
+  <div id="inv-list" class="list" style="margin-top:10px"></div>
+</div>
+
+<!-- 빈 슬롯: 기계 구매 -->
+<div id="m-buy" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>🛒 기계 구매</h2>
+  <div id="buy-list" class="list"></div>
+</div>
+
+<!-- 기계 관리 -->
+<div id="m-machine" class="modal hidden">
+  <button class="close">✕</button>
+  <h2 id="pm-title">기계</h2>
+  <div id="pm-stats"></div>
+  <div class="row">플레이 가격 <input id="pm-price" type="number" step="100" min="100"> 원 <span class="hint" id="pm-hint"></span></div>
+  <div class="row">집게 세팅 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
+    피티 <select id="pm-pity"><option value="0">없음</option><option value="10">10판</option><option value="20">20판</option><option value="30">30판</option><option value="50">50판</option></select></div>
+  <div class="hint" id="pm-eco"></div>
+  <h3>기계 안 인형 (<span id="pm-count"></span>)</h3>
+  <div id="pm-stock" class="list"></div>
+  <h3>창고에서 넣기</h3>
+  <div id="pm-inv" class="list"></div>
+  <div class="row" style="margin-top:12px"><button class="ghost" id="pm-sell">기계 팔기 (50%)</button></div>
+</div>
+
+<!-- 도움말 -->
+<div id="m-help" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>❓ 어떻게 노나</h2>
+  <div class="hint" style="font-size:14px; line-height:1.6">
+    1. <b>원정</b>에서 다른 가게 기계에 돈 넣고 인형을 뽑는다. (내돈내산)<br>
+    2. 뽑은 인형은 <b>창고</b>로. 직접 팔거나 내 기계에 넣는다.<br>
+    3. 빈 자리를 클릭해 <b>기계</b>를 사고, 인형을 넣고 가격·집게 세팅을 정하면 손님이 온다.<br>
+    4. 손님은 기대값(당첨률×인형시세 ÷ 가격)이 높을수록 많이 온다. 너무해 세팅은 손님이 안 온다.<br><br>
+    <b>뽑기 팁</b>: 집게가 느슨한 곳은 들고 가다 떨어진다. 상품구 바로 옆 인형을 노리거나, 떨어뜨려 탑을 쌓거나, 내려오는 집게로 밀어 넣어라.
+    작은 집게는 큰 인형이 안 잡힌다. 회오리는 올라가며 돌아서 인형이 날아간다. 피티 기계는 카운터를 세라.
+  </div>
+</div>
+
+<!-- 부재중 수익 -->
+<div id="m-offline" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>💤 다녀오신 동안</h2>
+  <div id="offline-body"></div>
+</div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+} }
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
