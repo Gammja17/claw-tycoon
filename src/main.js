@@ -46,7 +46,9 @@ let play = null; // { machine, scene, camera, shop, camIdx }
 function resize(){
   renderer.setSize(innerWidth, innerHeight);
   store.resize(innerWidth, innerHeight);
-  if (play){ play.camera.aspect = innerWidth/innerHeight; play.camera.fov = play.camera.aspect < 1 ? 64 : 50; play.camera.updateProjectionMatrix(); }
+  if (play){
+    play.camera.aspect = innerWidth/innerHeight; play.camera.updateProjectionMatrix();
+  }
 }
 addEventListener('resize', resize); resize();
 
@@ -207,7 +209,8 @@ function startPlay(){
 }
 $('pu-exit').onclick = () => { sfx.click(); exitPlay(); };
 $('pu-cam').onclick = () => toggleCam();
-function toggleCam(){ if (play){ play.camIdx = (play.camIdx+1)%3; sfx.click(); } }
+const CAM_NAMES = ['정면', '옆', '탑뷰'];
+function toggleCam(){ if (play){ play.camIdx = (play.camIdx+1)%3; sfx.click(); $('pu-cam').textContent = `📷 ${CAM_NAMES[play.camIdx]}`; } }
 let msgT = null;
 function showMsg(t){ const e = $('pu-msg'); if (!t){ e.classList.remove('show'); return; } e.textContent = t; e.classList.add('show'); clearTimeout(msgT); msgT = setTimeout(()=>e.classList.remove('show'), 1800); }
 
@@ -231,13 +234,15 @@ function enterPlay(shop){
     onCredits: c => { $('pu-credit').textContent = `크레딧 ${c}`; $('pu-start').disabled = !(machine && machine.state==='idle' && c>0); },
   });
   scene.add(machine.group);
-  play = { scene, camera, machine, shop, camIdx:0, camPos:new THREE.Vector3(0, 2.1, 3.1), camLook:new THREE.Vector3(0, 1.45, 0) };
+  const topCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1.12, 6);
+  topCam.position.set(0, BASE_H + shop.h + 1, 0); topCam.up.set(0, 0, -1); topCam.lookAt(0, BASE_H, 0);
+  play = { scene, camera, topCam, machine, shop, camIdx:0, camPos:new THREE.Vector3(0, 2.1, 3.1), camLook:new THREE.Vector3(0, 1.45, 0) };
   camera.position.copy(play.camPos);
   mode = 'play'; renderer.domElement.focus();
   $('store-ui').classList.add('hidden'); $('play-ui').classList.remove('hidden');
   $('pu-shop').textContent = shop.name; $('pu-desc').textContent = shop.desc;
   $('pu-coin').textContent = `💰 ${won(shop.cost)} 넣기`; $('pu-coin').disabled = false;
-  $('pu-credit').textContent = '크레딧 0'; $('pu-start').disabled = true;
+  $('pu-credit').textContent = '크레딧 0'; $('pu-start').disabled = true; $('pu-cam').textContent = '📷 정면';
   refreshStoreHUD();
 }
 function exitPlay(){
@@ -285,16 +290,25 @@ function loop(now){
     const m = play.machine;
     m.update(dt, input); input.drop = false;
     $('pu-timer-fill').style.width = (m.aimRatio*100) + '%';
-    // 카메라: 정면 / 옆 / 위
+    // 카메라: 정면 / 옆 / 탑뷰(뚜껑 안쪽에서 수직 하향)
     const sh = play.shop;
-    const targets = [
-      [new THREE.Vector3(0, BASE_H+1.25, sh.d/2+2.55), new THREE.Vector3(0, BASE_H+0.42, 0)],
-      [new THREE.Vector3(sh.w/2+2.3, BASE_H+1.1, 0.4), new THREE.Vector3(0, BASE_H+0.5, 0)],
-      [new THREE.Vector3(0.3, BASE_H+sh.h+1.6, sh.d/2+0.9), new THREE.Vector3(0, BASE_H+0.3, 0)],
-    ][play.camIdx];
-    play.camPos.lerp(targets[0], 1-Math.pow(0.001, dt)); play.camLook.lerp(targets[1], 1-Math.pow(0.001, dt));
-    play.camera.position.copy(play.camPos); play.camera.lookAt(play.camLook);
-    renderer.render(play.scene, play.camera);
+    const views = [
+      { pos:new THREE.Vector3(0, BASE_H+1.25, sh.d/2+2.55), look:new THREE.Vector3(0, BASE_H+0.42, 0), fov:50 },
+      { pos:new THREE.Vector3(sh.w/2+2.3, BASE_H+1.1, 0.4), look:new THREE.Vector3(0, BASE_H+0.5, 0), fov:50 },
+    ];
+    if (play.camIdx === 2){
+      const a = innerWidth/innerHeight, hh = Math.max(sh.d/2 + 0.2, (sh.w/2 + 0.2)/a), hw = hh*a;
+      Object.assign(play.topCam, { left:-hw, right:hw, top:hh, bottom:-hh }); play.topCam.updateProjectionMatrix();
+      renderer.render(play.scene, play.topCam);
+    }
+    else {
+      const v = views[play.camIdx];
+      const k = 1-Math.pow(0.001, dt);
+      play.camPos.lerp(v.pos, k); play.camLook.lerp(v.look, k);
+      play.camera.fov = lerp(play.camera.fov, play.camera.aspect < 1 ? v.fov + 14 : v.fov, k); play.camera.updateProjectionMatrix();
+      play.camera.position.copy(play.camPos); play.camera.lookAt(play.camLook);
+      renderer.render(play.scene, play.camera);
+    }
   }
   saveTimer += dt; if (saveTimer > 5){ saveTimer = 0; persist(); }
 }
