@@ -35,17 +35,17 @@ export const GRIP_PRESETS = {
 // 다른 가게들 (원정)
 export const SHOPS = [
   { id:'stationery', name:'동네 문방구 뽑기', cost:500, desc:'집게가 너무 느슨하다. 입구 근처 인형을 밀어 넣거나 탑을 쌓는 게 답.',
-    grip:'loose', pity:0, clawSize:1.0, spin:false, pool:['bear','bunny','duck'], count:24, color:0xff8fab, w:1.5,d:1.1,h:1.3 },
+    grip:'loose', pity:0, clawSize:1.0, spin:false, pool:['bear','bunny','duck'], count:20, color:0xff8fab, w:1.5,d:1.1,h:1.65 },
   { id:'station', name:'역전 뽑기샵', cost:1000, desc:'평소엔 느슨. 소문으로는 30판마다 한 번 꽉 잡아준다고... 카운터 표시 있음.',
-    grip:'loose', pity:30, clawSize:1.0, spin:false, pool:['bear','bunny','duck','cat','frog','penguin'], count:22, color:0x7cc6fe, w:1.6,d:1.2,h:1.4 },
+    grip:'loose', pity:30, clawSize:1.0, spin:false, pool:['bear','bunny','duck','cat','frog','penguin'], count:18, color:0x7cc6fe, w:1.6,d:1.2,h:1.75 },
   { id:'tiny', name:'작은집게 오락실', cost:500, desc:'집게가 작다. 큰 인형은 아예 안 잡히고 작은 인형만 노려야 함.',
-    grip:'normal', pity:0, clawSize:0.65, spin:false, pool:['duck','bunny','bear','panda'], count:22, color:0xa0e7a0, w:1.5,d:1.1,h:1.3 },
+    grip:'normal', pity:0, clawSize:0.65, spin:false, pool:['duck','bunny','bear','panda'], count:18, color:0xa0e7a0, w:1.5,d:1.1,h:1.65 },
   { id:'tornado', name:'회오리 크레인', cost:1000, desc:'집게가 올라가면서 빙글빙글 돈다. 원심력에 인형이 날아간다. 방향을 잘 재면...',
-    grip:'normal', pity:0, clawSize:1.0, spin:true, pool:['cat','frog','penguin','unicorn'], count:20, color:0xb28dff, w:1.6,d:1.2,h:1.4 },
+    grip:'normal', pity:0, clawSize:1.0, spin:true, pool:['cat','frog','penguin','unicorn'], count:16, color:0xb28dff, w:1.6,d:1.2,h:1.75 },
   { id:'strong', name:'짱짱 프리미엄', cost:2000, desc:'집게가 짱짱하다. 대신 비싸고 인형이 크고 무겁다.',
-    grip:'strong', pity:0, clawSize:1.0, spin:false, pool:['panda','unicorn','penguin','dragon'], count:18, color:0xffb36b, w:1.7,d:1.3,h:1.5 },
+    grip:'strong', pity:0, clawSize:1.0, spin:false, pool:['panda','unicorn','penguin','dragon'], count:14, color:0xffb36b, w:1.7,d:1.3,h:1.85 },
   { id:'legend', name:'전설의 황금기계', cost:5000, desc:'느슨한데 20판 피티가 있다는 소문. 황금곰이 산다.',
-    grip:'loose', pity:20, clawSize:1.1, spin:false, pool:['panda','unicorn','dragon','goldbear'], count:14, color:0xffd166, w:1.8,d:1.4,h:1.5 },
+    grip:'loose', pity:20, clawSize:1.1, spin:false, pool:['panda','unicorn','dragon','goldbear'], count:10, color:0xffd166, w:1.8,d:1.4,h:1.85 },
 ];
 
 // 내 가게에서 살 수 있는 기계

@@ -120,7 +120,7 @@ export class ClawMachine {
     this.group = this.cab.root;
     const { w, d, h } = spec;
     this.home = { x:-w/2+CHUTE/2, z:d/2-CHUTE/2 };
-    this.topY = h - 0.32;
+    this.topY = h - 0.24;
     this.claw = { x:this.home.x, y:this.topY, z:this.home.z, open:1, rot:0, vx:0, vz:0 };
     this.state = 'idle'; this.t = 0; this.timer = 0;
     this.held = null; this.wonThisPlay = false; this.droppedThisPlay = false;
@@ -312,7 +312,7 @@ export class ClawMachine {
         break;
       }
       case 'descend': {
-        const target = clamp(this.pileTopUnderClaw() - 0.1 + this.cab.TIP, this.cab.TIP + 0.02, this.topY);
+        const target = clamp(this.pileTopUnderClaw() - 0.18 + this.cab.TIP, this.cab.TIP + 0.02, this.topY - 0.2);
         c.y -= 0.85*dt;
         if (c.y <= target){ c.y = target; this.state = 'close'; this.t = 0; sfx.close(); }
         break;

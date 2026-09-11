@@ -75,7 +75,7 @@ export class StoreScene {
     cab.root.traverse(o => { o.userData.slot = i; });
     this.scene.add(cab.root); s.cab = cab;
     s.label.visible = false; s.pad.visible = false;
-    setClawOpen(cab, 1); placeClaw(cab, -m.w/2+CHUTE/2, m.h-0.32, m.d/2-CHUTE/2);
+    setClawOpen(cab, 1); placeClaw(cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2);
     this.refreshStock(i);
   }
   // 재고 인형을 정적으로 배치
@@ -169,7 +169,7 @@ export class StoreScene {
       } else if (cu.phase === 'play'){
         cu.wait -= dt; cu.g.position.y = bob*0.3;
         const s = this.slots[cu.i];
-        if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m){ const p = 0.5+0.5*Math.sin(cu.t*3); placeClaw(s.cab, lerp(-m.w/4, m.w/4, p), m.h-0.32 - Math.max(0, Math.sin(cu.t*2))*0.4, lerp(-m.d/4, m.d/4, 0.5+0.5*Math.cos(cu.t*2)), 0); } }
+        if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m){ const p = 0.5+0.5*Math.sin(cu.t*3); placeClaw(s.cab, lerp(-m.w/4, m.w/4, p), m.h-0.24 - Math.max(0, Math.sin(cu.t*2))*0.4, lerp(-m.d/4, m.d/4, 0.5+0.5*Math.cos(cu.t*2)), 0); } }
         if (cu.wait <= 0){
           const res = cu.apply();
           const pos = cu.g.position.clone().add(new THREE.Vector3(0, 1.3, 0));
@@ -178,7 +178,7 @@ export class StoreScene {
             if (res.win) this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '🎉 ' + PLUSH_TYPES[res.key].name + ' 당첨!', 'win');
           }
           cu.phase = 'out';
-          if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.32, m.d/2-CHUTE/2); }
+          if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
         }
       }
     }

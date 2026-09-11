@@ -24,6 +24,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 app.appendChild(renderer.domElement);
+renderer.domElement.tabIndex = 0; renderer.domElement.style.outline = 'none';
 
 const $ = id => document.getElementById(id);
 const floatLayer = document.body;
@@ -45,7 +46,7 @@ let play = null; // { machine, scene, camera, shop, camIdx }
 function resize(){
   renderer.setSize(innerWidth, innerHeight);
   store.resize(innerWidth, innerHeight);
-  if (play){ play.camera.aspect = innerWidth/innerHeight; play.camera.updateProjectionMatrix(); }
+  if (play){ play.camera.aspect = innerWidth/innerHeight; play.camera.fov = play.camera.aspect < 1 ? 64 : 50; play.camera.updateProjectionMatrix(); }
 }
 addEventListener('resize', resize); resize();
 
@@ -220,7 +221,7 @@ function enterPlay(shop){
   const ground = box(14, 0.1, 14, 0xf7d9b5, 0, -0.05, 0); ground.receiveShadow = true; scene.add(ground);
   scene.add(box(14, 4, 0.2, 0xcfe8ff, 0, 2, -3));
   // 옆 장식 기계 (분위기)
-  const camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, 0.1, 50);
+  const camera = new THREE.PerspectiveCamera(innerWidth/innerHeight < 1 ? 64 : 50, innerWidth/innerHeight, 0.1, 50);
   let machine;
   machine = new ClawMachine(shop, {
     playCount: save.playCounts[shop.id] || 0,
@@ -232,7 +233,7 @@ function enterPlay(shop){
   scene.add(machine.group);
   play = { scene, camera, machine, shop, camIdx:0, camPos:new THREE.Vector3(0, 2.1, 3.1), camLook:new THREE.Vector3(0, 1.45, 0) };
   camera.position.copy(play.camPos);
-  mode = 'play';
+  mode = 'play'; renderer.domElement.focus();
   $('store-ui').classList.add('hidden'); $('play-ui').classList.remove('hidden');
   $('pu-shop').textContent = shop.name; $('pu-desc').textContent = shop.desc;
   $('pu-coin').textContent = `💰 ${won(shop.cost)} 넣기`; $('pu-coin').disabled = false;
