@@ -30,9 +30,10 @@ export const sfx = {
       const c = ac();
       if (on && !motorOsc){
         motorOsc = c.createOscillator(); motorGain = c.createGain();
-        motorOsc.type = 'sawtooth'; motorOsc.frequency.value = 55;
-        motorGain.gain.value = 0.025;
-        motorOsc.connect(motorGain); motorGain.connect(c.destination); motorOsc.start();
+        const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+        motorOsc.type = 'triangle'; motorOsc.frequency.value = 60;
+        motorGain.gain.value = 0.006;
+        motorOsc.connect(lp); lp.connect(motorGain); motorGain.connect(c.destination); motorOsc.start();
       } else if (!on && motorOsc){
         motorOsc.stop(); motorOsc.disconnect(); motorOsc = null; motorGain = null;
       }
