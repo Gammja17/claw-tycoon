@@ -51,9 +51,9 @@ export const SHOPS = [
 
 // 내 가게에서 살 수 있는 기계
 export const MY_MACHINES = [
-  { id:'small', name:'소형 크레인', price:40000,  capacity:8,  baseRate:3, color:0xffa4c4, w:1.3,d:1.0,h:1.2 },
-  { id:'mid',   name:'중형 크레인', price:120000, capacity:14, baseRate:5, color:0x8fd3ff, w:1.6,d:1.2,h:1.4 },
-  { id:'big',   name:'대형 크레인', price:350000, capacity:24, baseRate:8, color:0xffe08a, w:1.9,d:1.4,h:1.6 },
+  { id:'small', name:'소형 크레인', price:40000,  capacity:8,  baseRate:8, color:0xffa4c4, w:1.3,d:1.0,h:1.2 },
+  { id:'mid',   name:'중형 크레인', price:120000, capacity:14, baseRate:12, color:0x8fd3ff, w:1.6,d:1.2,h:1.4 },
+  { id:'big',   name:'대형 크레인', price:350000, capacity:24, baseRate:18, color:0xffe08a, w:1.9,d:1.4,h:1.6 },
 ];
 // 손님이 이길 확률(집게 세팅별). 작은 집게면 ×0.6
 export const CUSTOMER_WINRATE = { loose:0.05, normal:0.13, strong:0.32 };

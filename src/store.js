@@ -58,7 +58,7 @@ export class StoreScene {
       label.scale.set(1.5, 0.62, 1); label.position.set(x, 0.9, z); this.scene.add(label);
       return { i, x, z, pad, label, cab:null, plushMeshes:[], clawT:rand(0,10) };
     });
-    this.customers = []; this.acc = 0;
+    this.customers = []; this.wanderers = []; this.acc = 0;
     this.raycaster = new THREE.Raycaster();
     this.slots.forEach((_, i) => this.rebuildSlot(i));
   }
@@ -112,7 +112,7 @@ export class StoreScene {
       if (!data) return;
       const eco = slotEconomy(data, this.save.rep);
       if (eco.total <= 0 || eco.rate <= 0) return;
-      if (Math.random() < eco.rate/60*dt && this.customers.length < 10){
+      if (Math.random() < eco.rate/60*dt && this.customers.length < 18){
         const apply = () => this.customerPlay(i);
         if (visuals) this.spawnCustomer(i, apply); else apply();
       }
@@ -145,20 +145,52 @@ export class StoreScene {
     this.hooks.onChange();
     return { win, key, price:data.price, complaint };
   }
+  makePerson(){
+    const g = new THREE.Group();
+    const c = PASTELS[Math.floor(Math.random()*PASTELS.length)];
+    const sc = rand(0.85, 1.1); g.scale.setScalar(sc);
+    g.add(cyl(0.13, 0.16, 0.42, c, 0, 0.36, 0, 8));
+    g.add(sphere(0.13, [0xffd9b3, 0xf1c8a0, 0xd9a577][Math.floor(Math.random()*3)], 0, 0.72, 0));
+    g.add(sphere(0.135, [0x3b2a1e, 0x1e1e26, 0x9b6b3d, 0xd88aa6, 0xe8c07a][Math.floor(Math.random()*5)], 0, 0.78, -0.02, 1, 0.7, 1));
+    [-1,1].forEach(sg => g.add(sphere(0.02, 0x1c1c22, sg*0.045, 0.73, 0.115)));
+    [-1,1].forEach(sg => g.add(cyl(0.04, 0.04, 0.3, [0x5566aa, 0x333344, 0x88aa66][Math.floor(Math.random()*3)], sg*0.07, 0.15, 0, 6)));
+    g.position.copy(DOOR).add(new THREE.Vector3(rand(-0.5,0.5), 0, rand(0, 0.3)));
+    this.scene.add(g);
+    return g;
+  }
   spawnCustomer(i, apply){
     const s = this.slots[i], data = this.save.slots[i];
     const m = MY_MACHINES.find(x => x.id === data.machine);
-    const g = new THREE.Group();
-    const c = PASTELS[Math.floor(Math.random()*PASTELS.length)];
-    g.add(cyl(0.13, 0.16, 0.42, c, 0, 0.36, 0, 8));
-    g.add(sphere(0.13, 0xffd9b3, 0, 0.72, 0));
-    g.add(sphere(0.135, [0x3b2a1e, 0x1e1e26, 0x9b6b3d, 0xd88aa6][Math.floor(Math.random()*4)], 0, 0.78, -0.02, 1, 0.7, 1));
-    [-1,1].forEach(sg => g.add(sphere(0.02, 0x1c1c22, sg*0.045, 0.73, 0.115)));
-    [-1,1].forEach(sg => g.add(cyl(0.04, 0.04, 0.3, 0x5566aa, sg*0.07, 0.15, 0, 6)));
-    g.position.copy(DOOR).add(new THREE.Vector3(rand(-0.4,0.4), 0, 0));
-    this.scene.add(g);
-    const target = new THREE.Vector3(s.x + rand(-0.2,0.2), 0, s.z + m.d/2 + 0.55);
-    this.customers.push({ g, i, apply, phase:'in', target, wait:0, t:0 });
+    const g = this.makePerson();
+    // 같은 기계에 이미 온 손님이 있으면 뒤에 줄 선다
+    const ahead = this.customers.filter(c => c.i === i && c.phase !== 'out').length;
+    const target = new THREE.Vector3(s.x + rand(-0.15,0.15) + (ahead%2 ? 0.25 : -0.25)*(ahead>0), 0, s.z + m.d/2 + 0.55 + ahead*0.45);
+    this.customers.push({ g, i, apply, phase:'in', target, wait:0, t:0, speed:rand(1.4, 2.0) });
+  }
+  // 구경꾼: 놀지는 않고 가게 안을 돌아다닌다. 평점·기계 수에 비례
+  wanderTarget(){
+    const slots = this.slots.filter(s => s.cab);
+    if (slots.length && Math.random() < 0.7){ const s = slots[Math.floor(Math.random()*slots.length)]; return new THREE.Vector3(s.x + rand(-0.8, 0.8), 0, s.z + 1.0 + rand(0.2, 0.9)); }
+    return new THREE.Vector3(rand(-4.5, 4.5), 0, rand(-0.6, 3.8));
+  }
+  updateWanderers(dt){
+    const machines = this.save.slots.filter(Boolean).length;
+    const want = machines === 0 ? 0 : Math.min(14, Math.round(1 + machines*1.5 + (this.save.rep ?? 3)*1.2));
+    this.wanderT = (this.wanderT || 0) + dt;
+    if (this.wanderers.length < want && this.wanderT > 0.8){ this.wanderT = 0; this.wanderers.push({ g:this.makePerson(), target:this.wanderTarget(), wait:0, t:rand(0,10), speed:rand(0.8, 1.3), leaving:false }); }
+    if (this.wanderers.length > want && this.wanderT > 0.8){ this.wanderT = 0; const w = this.wanderers.find(x => !x.leaving); if (w){ w.leaving = true; w.target = DOOR.clone(); w.wait = 0; } }
+    for (let k=this.wanderers.length-1; k>=0; k--){
+      const w = this.wanderers[k]; w.t += dt;
+      if (w.wait > 0){ w.wait -= dt; w.g.position.y = Math.abs(Math.sin(w.t*2))*0.01; continue; }
+      const dir = w.target.clone().sub(w.g.position); dir.y = 0; const dist = dir.length();
+      if (dist < 0.08){
+        if (w.leaving){ this.scene.remove(w.g); this.wanderers.splice(k,1); continue; }
+        w.wait = rand(1.5, 5); w.target = this.wanderTarget();
+      } else {
+        dir.normalize(); w.g.position.add(dir.multiplyScalar(Math.min(dist, w.speed*dt)));
+        w.g.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI; w.g.position.y = Math.abs(Math.sin(w.t*9))*0.035;
+      }
+    }
   }
   update(dt){
     // 손님
@@ -172,7 +204,7 @@ export class StoreScene {
           if (cu.phase === 'in'){ cu.phase = 'play'; cu.wait = 2.2 + Math.random(); cu.g.rotation.y = 0; }
           else { this.scene.remove(cu.g); this.customers.splice(k,1); continue; }
         } else {
-          dir.normalize(); cu.g.position.add(dir.multiplyScalar(Math.min(dist, 1.7*dt)));
+          dir.normalize(); cu.g.position.add(dir.multiplyScalar(Math.min(dist, (cu.speed||1.7)*dt)));
           cu.g.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI; cu.g.position.y = bob;
         }
       } else if (cu.phase === 'play'){
@@ -188,10 +220,12 @@ export class StoreScene {
             else if (res.complaint) this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '😡 너무해!! 집게 뭐야', 'bad');
           }
           cu.phase = 'out';
+          if (Math.random() < 0.4){ this.wanderers.push({ g:cu.g, target:this.wanderTarget(), wait:0, t:cu.t, speed:rand(0.8,1.3), leaving:false }); this.customers.splice(k,1); if (s.cab){ const m2 = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m2) placeClaw(s.cab, -m2.w/2+CHUTE/2, m2.h-0.24, m2.d/2-CHUTE/2); } continue; }
           if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
         }
       }
     }
+    this.updateWanderers(dt);
     // 조명
     const tt = performance.now()/1000;
     this.slots.forEach(s => { if (s.cab) s.cab.lights.forEach((l,i) => { l.material.emissiveIntensity = (Math.floor(tt*3)+i)%2 ? 1 : 0.15; }); });
