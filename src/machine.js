@@ -112,7 +112,8 @@ export function placeClaw(cab, x, y, z){
 
 // ---------- 플레이 가능한 기계 (완전 물리) ----------
 const AIM_TIME = 25;
-const MOTOR_SPEED = 2.5;
+const MOTOR_SPEED = 1.8;
+const H = 1/120;            // 물리 고정 스텝
 export class ClawMachine {
   constructor(spec, opts={}){
     this.spec = spec;
@@ -154,10 +155,13 @@ export class ClawMachine {
     this.wallMat = new CANNON.Material('wall');
     this.fingerMat = new CANNON.Material('finger');
     this.headMat = new CANNON.Material('head');
-    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.plushMat, { friction:0.6, restitution:0.05 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.wallMat, { friction:0.5, restitution:0.05 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.fingerMat, { friction:0.9, restitution:0.0, contactEquationStiffness:1e7, contactEquationRelaxation:3 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.headMat, { friction:0.3, restitution:0.0 }));
+    // 천인형: 반발 0, 마찰 높게, 접촉은 부드럽게(눌리는 느낌)
+    const soft = { contactEquationStiffness:8e5, contactEquationRelaxation:4, frictionEquationStiffness:8e5, frictionEquationRelaxation:4 };
+    world.defaultContactMaterial.restitution = 0; world.defaultContactMaterial.contactEquationStiffness = 8e5; world.defaultContactMaterial.contactEquationRelaxation = 4;
+    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.plushMat, { friction:0.8, restitution:0, ...soft }));
+    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.wallMat, { friction:0.7, restitution:0, ...soft }));
+    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.fingerMat, { friction:0.95, restitution:0, contactEquationStiffness:1.5e6, contactEquationRelaxation:4, frictionEquationStiffness:1.5e6, frictionEquationRelaxation:4 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(this.plushMat, this.headMat, { friction:0.4, restitution:0, ...soft }));
     world.addContactMaterial(new CANNON.ContactMaterial(this.fingerMat, this.fingerMat, { friction:0.2, restitution:0.0 }));
     world.addContactMaterial(new CANNON.ContactMaterial(this.fingerMat, this.wallMat, { friction:0.3, restitution:0.0 }));
     const addBox = (hx,hy,hz,x,y,z) => {
@@ -186,8 +190,8 @@ export class ClawMachine {
     this.head.addShape(new CANNON.Sphere(0.075*cs));
     this.head.position.set(this.home.x, this.anchorY - this.L0, this.home.z); world.addBody(this.head);
     this.swing = { ox:0, oz:0, vx:0, vz:0 };          // 진자 수평 오프셋/속도
-    this.prevAnchorV = { x:0, z:0 };
-    this.fingers = []; this.angles = [0.8, 0.8, 0.8]; this.reaction = [0, 0, 0]; this.touch = [false,false,false]; this.latched = [false,false,false]; this.moving = [false,false,false]; this.touchCount = [0,0,0]; this.still = [0,0,0]; this.closeTime = 0; this.headTouch = false;
+    this.prevAnchorV = { x:0, z:0 }; this.prevAnchor = { x:this.home.x, z:this.home.z }; this.anchorAcc = { x:0, z:0 }; this.acc = 0;
+    this.fingers = []; this.angles = [0.8, 0.8, 0.8]; this.reaction = [0, 0, 0]; this.touch = [false,false,false]; this.latched = [false,false,false]; this.moving = [false,false,false]; this.touchCount = [0,0,0]; this.depth = [0,0,0]; this.still = [0,0,0]; this.closeTime = 0; this.headTouch = false;
     const L = FINGER_LEN*cs;
     for (let i=0;i<3;i++){
       const f = new CANNON.Body({ mass:0, type:CANNON.Body.KINEMATIC, material:this.fingerMat });
@@ -216,31 +220,38 @@ export class ClawMachine {
         const dq = q.mult(f.quaternion.inverse()); if (dq.w < 0){ dq.x=-dq.x; dq.y=-dq.y; dq.z=-dq.z; }
         f.angularVelocity.set(2*dq.x/dt, 2*dq.y/dt, 2*dq.z/dt);
       } else { f.position.copy(pos); f.quaternion.copy(q); f.velocity.setZero(); f.angularVelocity.setZero(); }
-      f.hingeWorld = hinge; f.axisWorld = hq.vmult(qY.vmult(new CANNON.Vec3(1,0,0)));
+      f.hingeWorld = hinge; f.axisWorld = hq.vmult(qY.vmult(new CANNON.Vec3(1,0,0))); f.targetQ = q;
     }
   }
-  // 접촉/마찰 반력이 손가락에 주는 힌지 토크 (+ = 벌리는 방향) 및 접촉 여부
+  // 손가락별: (1) 인형과의 최대 눌림 깊이 (2) 인형이 손가락을 아래로 누르는 힘(무게)이 만드는 벌림 토크
   readReactions(){
+    const plushSet = new Set(this.plushes.map(p => p.body));
+    this.headTouch = this.world.contacts.some(e => (e.bi === this.head && plushSet.has(e.bj)) || (e.bj === this.head && plushSet.has(e.bi)));
     const eqs = [...this.world.contacts, ...this.world.frictionEquations];
-    this.headTouch = this.world.contacts.some(e => (e.bi === this.head || e.bj === this.head) && this.plushes.some(p => p.body === e.bi || p.body === e.bj));
     for (let i=0;i<3;i++){
-      const f = this.fingers[i]; let tau = 0, touch = false;
+      const f = this.fingers[i]; let tau = 0, depth = 0, touch = false;
       for (const e of eqs){
-        if (e.bi !== f && e.bj !== f) continue;
-        const other = e.bi === f ? e.bj : e.bi;
-        if (!this.plushes.some(p => p.body === other)) continue;
+        const isI = e.bi === f, isJ = e.bj === f;
+        if (!isI && !isJ) continue;
+        const other = isI ? e.bj : e.bi;
+        if (!plushSet.has(other)) continue;
         touch = true;
+        if (e.ni){ // 접촉 방정식: 눌림 깊이
+          const pi = e.bi.position.vadd(e.ri), pj = e.bj.position.vadd(e.rj);
+          const dsep = pj.vsub(pi).dot(e.ni);
+          if (dsep < 0) depth = Math.max(depth, -dsep);
+        }
         if (!(e.multiplier > 0)) continue;
-        const dir = e.ni || e.t; if (!dir) continue;
-        const isI = e.bi === f;
+        const dir = e.ni || e.t;
         const F = dir.scale(isI ? -e.multiplier : e.multiplier);
+        if (F.y > -0.35*F.length()) continue;         // 옆에서 끼는 힘은 제외, 위에서 누르는 하중(무게)만
         const p = f.position.vadd(isI ? e.ri : e.rj);
         tau += p.vsub(f.hingeWorld).cross(F).dot(f.axisWorld);
       }
-      this.touch[i] = touch;
-      // 손가락이 멈춰 있을 때만 준정적 반력으로 인정 (움직이는 동안의 충격은 무시)
-      const open = clamp(-tau, -3, 3);
-      if (this.still[i] < 0.15) this.reaction[i] = 0; else this.reaction[i] = this.reaction[i]*0.85 + open*0.15;
+      this.touch[i] = touch; this.depth[i] = depth;
+      const open = clamp(-tau, -4, 4);
+      // 서보가 쉬고 있을 때만(닫는 중 충격 제외) 반력을 누적
+      if (this.still[i] < 0.1) this.reaction[i] = 0; else this.reaction[i] = this.reaction[i]*0.92 + open*0.08;
     }
   }
   spawnPlushes(){
@@ -295,56 +306,77 @@ export class ClawMachine {
       let da = 0;
       if (this.fingerMode === 'close'){
         const T = this.torque;
-        this.touchCount[i] = this.touch[i] ? this.touchCount[i] + 1 : 0;
-        if (this.touchCount[i] >= 3 && this.closeTime > 0.1) this.latched[i] = true;   // 닫는 중 연속 접촉 → 거기서 멈춤(래치)
-        if (r > T) da = Math.min(SPEED*0.6, SPEED*0.6*(r - T)/T);   // 힘 부족: 밀려서 벌어짐
-        else if (!this.latched[i] && a > -0.15) da = -SPEED;         // 닿을 때까지 오므림
+        // 인형이 토크에 비례하는 깊이만큼 눌리면(=안 밀리면) 거기서 멈춤. 센 집게일수록 더 파고든다
+        const depthLimit = 0.003 + T*0.004;
+        if (this.depth[i] > depthLimit && this.closeTime > 0.05) this.latched[i] = true;
+        if (!this.latched[i]){ if (a > -0.15) da = this.touch[i] ? -SPEED*0.25 : -SPEED; }   // 오므림 (닿으면 천천히: 인형을 밀어내지 않게)
+        else {
+          // 눌림 깊이 서보: 살짝 닿아 있는 정도(2mm)만 유지해서 끼임 힘을 없앤다
+          const dd = this.depth[i] - 0.001;
+          const servo = clamp(dd*60, -0.25, 0.25);                     // +: 너무 눌림 → 벌림
+          if (this.touch[i]) da = servo; else if (a > -0.15) da = -0.35; // 놓쳤으면 천천히 더 오므림
+          if (r > T) da += Math.min(SPEED*0.7, SPEED*0.7*(r - T)/T);  // 힘 부족: 밀려서 벌어짐(흘러내림)
+        }
       } else {
         this.latched[i] = false;
         if (a < OPEN) da = SPEED; else if (a > OPEN + 0.1) da = -SPEED*0.5;
       }
-      this.moving[i] = Math.abs(da) > 0.5;
+      this.moving[i] = Math.abs(da) > 0.3;
       this.still[i] = this.moving[i] ? 0 : this.still[i] + dt;
       this.angles[i] = clamp(a + da*dt, -0.2, 1.4);
     }
   }
+  // 프레임 dt를 1/120 고정 서브스텝으로 나눠 돌린다. 키네마틱 속도 제어가 서브스텝마다 정확히 목표에 도착하도록.
   stepPhysics(dt){
     if (dt <= 0) return;
-    // 앵커
-    const a = this.anchorBody;
-    const avx = (this.anchor.x - a.position.x)/dt, avz = (this.anchor.z - a.position.z)/dt;
-    a.velocity.set(avx, (this.anchorY - a.position.y)/dt, avz);
+    // 앵커 속도/가속(프레임 단위): 진자 구동원
+    const avx = (this.anchor.x - this.prevAnchor.x)/dt, avz = (this.anchor.z - this.prevAnchor.z)/dt;
+    this.anchorAcc = { x:(avx - this.prevAnchorV.x)/dt, z:(avz - this.prevAnchorV.z)/dt };
+    this.prevAnchorV = { x:avx, z:avz }; this.prevAnchor = { x:this.anchor.x, z:this.anchor.z };
+    this.anchorBody.position.set(this.anchor.x, this.anchorY, this.anchor.z);
+    this.acc += dt; let n = 0;
+    while (this.acc >= H && n < 6){ this.substep(H); this.acc -= H; n++; }
+    if (n >= 6) this.acc = 0;
+  }
+  substep(h){
     // 진자: 앵커 가속에 반응해 흔들림 (회오리 테크닉의 근원)
     const sw = this.swing, L = this.L, g = 9.82, damp = (this.spec.swing ?? 0.3) * 6;
-    const ax = (avx - this.prevAnchorV.x)/dt, az = (avz - this.prevAnchorV.z)/dt;
-    this.prevAnchorV = { x:avx, z:avz };
-    sw.vx += (-(g/L)*sw.ox - damp*sw.vx - ax*0.6) * dt;
-    sw.vz += (-(g/L)*sw.oz - damp*sw.vz - az*0.6) * dt;
-    sw.ox += sw.vx*dt; sw.oz += sw.vz*dt;
+    const { w, d } = this.spec;
+    sw.vx += (-(g/L)*sw.ox - damp*sw.vx - this.anchorAcc.x*0.6) * h;
+    sw.vz += (-(g/L)*sw.oz - damp*sw.vz - this.anchorAcc.z*0.6) * h;
+    sw.ox += sw.vx*h; sw.oz += sw.vz*h;
     const maxO = L*0.8, mag = Math.hypot(sw.ox, sw.oz);
     if (mag > maxO){ sw.ox *= maxO/mag; sw.oz *= maxO/mag; sw.vx *= 0.5; sw.vz *= 0.5; }
-    const hx = this.anchor.x + sw.ox, hz = this.anchor.z + sw.oz;
+    // 유리벽 안쪽으로 제한
+    let hx = this.anchor.x + sw.ox, hz = this.anchor.z + sw.oz;
+    const bx = w/2 - 0.09, bz = d/2 - 0.09;
+    if (hx > bx){ hx = bx; sw.ox = hx - this.anchor.x; sw.vx = Math.min(0, sw.vx)*0.3; }
+    if (hx < -bx){ hx = -bx; sw.ox = hx - this.anchor.x; sw.vx = Math.max(0, sw.vx)*0.3; }
+    if (hz > bz){ hz = bz; sw.oz = hz - this.anchor.z; sw.vz = Math.min(0, sw.vz)*0.3; }
+    if (hz < -bz){ hz = -bz; sw.oz = hz - this.anchor.z; sw.vz = Math.max(0, sw.vz)*0.3; }
     const hy = this.anchorY - Math.sqrt(Math.max(0.0001, L*L - sw.ox*sw.ox - sw.oz*sw.oz));
-    const h = this.head;
-    h.velocity.set((hx-h.position.x)/dt, (hy-h.position.y)/dt, (hz-h.position.z)/dt);
+    const hb = this.head;
+    hb.velocity.set((hx-hb.position.x)/h, (hy-hb.position.y)/h, (hz-hb.position.z)/h);
     // 케이블 방향으로 기울기 (각속도 P 제어)
     const dir = new CANNON.Vec3(hx-this.anchor.x, hy-this.anchorY, hz-this.anchor.z); dir.normalize();
     const q = new CANNON.Quaternion(); q.setFromVectors(new CANNON.Vec3(0,-1,0), dir);
-    const dq = q.mult(h.quaternion.inverse()); if (dq.w < 0){ dq.x=-dq.x; dq.y=-dq.y; dq.z=-dq.z; }
-    h.angularVelocity.set(2*dq.x/dt, 2*dq.y/dt, 2*dq.z/dt);
+    const dq = q.mult(hb.quaternion.inverse()); if (dq.w < 0){ dq.x=-dq.x; dq.y=-dq.y; dq.z=-dq.z; }
+    hb.angularVelocity.set(2*dq.x/h, 2*dq.y/h, 2*dq.z/h);
     this.headTarget = { x:hx, y:hy, z:hz, q };
-    this.applyMotors(dt);
-    this.placeFingers(dt);
-    this.world.step(1/120, dt, 8);
+    this.applyMotors(h);
+    this.placeFingers(h);
+    this.world.step(H);
     this.readReactions();
   }
   syncMeshes(){
     for (const p of this.plushes){ p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); }
     const cab = this.cab, L = FINGER_LEN*this.cs;
-    cab.claw.position.copy(this.head.position); cab.claw.quaternion.copy(this.head.quaternion);
+    const ht = this.headTarget;
+    if (ht){ cab.claw.position.set(ht.x, ht.y, ht.z); cab.claw.quaternion.copy(ht.q); }
+    else { cab.claw.position.copy(this.head.position); cab.claw.quaternion.copy(this.head.quaternion); }
     this.fingers.forEach((f, i) => {
-      const top = f.position.vadd(f.quaternion.vmult(new CANNON.Vec3(0, L/2, 0)));
-      cab.fingers[i].pivot.position.copy(top); cab.fingers[i].pivot.quaternion.copy(f.quaternion);
+      const q = f.targetQ || f.quaternion;
+      cab.fingers[i].pivot.position.copy(f.hingeWorld || f.position); cab.fingers[i].pivot.quaternion.copy(q);
     });
     cab.carriage.position.set(this.anchor.x, this.railY, this.anchor.z);
     cab.crossBar.position.z = this.anchor.z;
@@ -401,10 +433,11 @@ export class ClawMachine {
       }
       case 'descend': {
         this.fingerMode = 'open'; this.closeTime = 0;
-        this.L += 0.5*dt;
-        // 헤드가 인형에 닿거나(무게로 얹힘), 손가락 끝이 바닥에 닿으면 정지
-        if ((this.headTouch && this.L > this.L0 + 0.05) || this.L >= this.Lmax){
-          this.L = Math.min(this.L, this.anchorY - this.head.position.y + 0.01);
+        this.L += 0.42*dt;
+        // 헤드 바로 아래 인형 꼭대기 직전(건드리지 않게)에서 멈춤. 접촉하면 즉시 정지. 손가락 끝이 바닥이면 정지
+        const targetY = this.pileTopUnderHead() + 0.075*this.cs + 0.008;
+        if ((this.head.position.y <= targetY && this.L > this.L0 + 0.05) || (this.headTouch && this.L > this.L0 + 0.05) || this.L >= this.Lmax){
+          this.L = Math.min(this.L, this.anchorY - this.head.position.y - (this.headTouch ? 0.006 : 0));
           this.state = 'close'; this.t = 0; sfx.close();
         }
         break;

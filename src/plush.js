@@ -38,7 +38,7 @@ export function buildPlushMesh(key){
 // 물리 바디: 몸통 구 + 머리 구
 export function makePlushBody(key, material){
   const t = PLUSH_TYPES[key], s = t.size;
-  const body = new CANNON.Body({ mass: 0.4*s*s, material, linearDamping:0.4, angularDamping:0.75,
+  const body = new CANNON.Body({ mass: 0.4*s*s, material, linearDamping:0.6, angularDamping:0.92,
     allowSleep:true, sleepSpeedLimit:0.2, sleepTimeLimit:0.5 });
   body.addShape(new CANNON.Sphere(0.145*s));
   body.addShape(new CANNON.Sphere(0.11*s), new CANNON.Vec3(0, 0.17*s, 0));

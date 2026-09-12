@@ -29,7 +29,7 @@ export const RARITY_WEIGHT = [6, 3, 1.4, 0.5];
 export const GRIP_PRESETS = {
   loose:  { label:'느슨함 (너무해)', torque:0.15, torqueVar:0.2 },
   normal: { label:'보통',           torque:0.32, torqueVar:0.15 },
-  strong: { label:'짱짱함',         torque:0.7,  torqueVar:0.1 },
+  strong: { label:'짱짱함',         torque:1.0,  torqueVar:0.1 },
 };
 
 // 다른 가게들 (원정)
