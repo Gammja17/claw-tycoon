@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAVE_KEY, won } from './data.js';
+import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAVE_KEY, WHOLESALE_INTERVAL, makeWholesaleOffers, won } from './data.js';
 import { ClawMachine, BASE_H } from './machine.js';
 import { StoreScene, slotEconomy } from './store.js';
 import { box, clamp, lerp } from './util.js';
@@ -10,7 +10,9 @@ function loadSave(){
   let s = null;
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch(e){}
   if (!s) s = { money:START_MONEY, inv:{}, slots:[null,null,null,null,null,null], playCounts:{}, lastTime:Date.now(), stats:{plays:0, wins:0, spent:0} };
-  s.slots = s.slots.map(sl => sl ? { grip:'normal', pity:0, pityCount:0, ...sl, stats:{plays:0,wins:0,revenue:0, ...(sl.stats||{})} } : null);
+  s.slots = s.slots.map(sl => sl ? { grip:'normal', pity:0, pityCount:0, clawSize:1, ...sl, stats:{plays:0,wins:0,revenue:0, ...(sl.stats||{})} } : null);
+  if (s.rep == null) s.rep = 3;
+  if (!s.wholesale) s.wholesale = { time:0, offers:[] };
   return s;
 }
 const save = loadSave();
@@ -55,8 +57,9 @@ addEventListener('resize', resize); resize();
 function refreshStoreHUD(){
   $('su-money').textContent = won(save.money);
   const n = save.slots.filter(Boolean).length;
-  let rate = 0; save.slots.forEach(s => { if (s) rate += slotEconomy(s).profitPerMin; });
+  let rate = 0; save.slots.forEach(s => { if (s) rate += slotEconomy(s, save.rep).profitPerMin; });
   $('su-info').textContent = `기계 ${n}대 · 예상 ${won(rate)}/분`;
+  $('su-rep').textContent = `⭐ ${save.rep.toFixed(1)}`;
   if (mode === 'play') $('pu-money').textContent = won(save.money);
 }
 
@@ -85,7 +88,7 @@ $('su-trip').onclick = () => {
     const pool = sh.pool.map(k => PLUSH_TYPES[k].name).join(', ');
     el.innerHTML = `<div class="swatch" style="background:#${sh.color.toString(16).padStart(6,'0')}"></div>
       <div class="body"><div class="title">${sh.name} <span class="tag" style="background:#1f9d55">1판 ${won(sh.cost)}</span></div>
-      <div class="desc">${sh.desc}</div><div class="desc">인형: ${pool} · 집게 ${GRIP_PRESETS[sh.grip].label}${sh.clawSize<1?' · 작은집게':''}${sh.spin?' · 회오리':''}${sh.pity?` · 피티 ${sh.pity}판`:''}</div></div>`;
+      <div class="desc">${sh.desc}</div><div class="desc">인형: ${pool} · 집게 ${GRIP_PRESETS[sh.grip].label}${sh.clawSize<1?' · 작은집게':''}${sh.swing<0.2?' · 회오리(스윙) 잘 됨':''}${sh.pity?` · 피티 ${sh.pity}판`:''}</div></div>`;
     const b = document.createElement('button'); b.textContent = '가기';
     b.onclick = () => { sfx.click(); closeModals(); enterPlay(sh); };
     el.appendChild(b); list.appendChild(el);
@@ -107,6 +110,26 @@ function renderInv(){
   });
 }
 $('su-inv').onclick = () => { sfx.click(); renderInv(); openModal('m-inv'); };
+// 도매 시장
+function refreshWholesale(){
+  if (Date.now() - save.wholesale.time > WHOLESALE_INTERVAL){ save.wholesale = { time:Date.now(), offers:makeWholesaleOffers() }; persist(); }
+}
+function renderWholesale(){
+  refreshWholesale();
+  const left = Math.max(0, WHOLESALE_INTERVAL - (Date.now() - save.wholesale.time));
+  $('whole-timer').textContent = `다음 입고까지 ${Math.ceil(left/60000)}분`;
+  const list = $('whole-list'); list.innerHTML = '';
+  const offers = save.wholesale.offers.filter(o => o.qty > 0);
+  if (!offers.length) list.innerHTML = '<div class="hint">다 팔렸다. 다음 입고를 기다리자.</div>';
+  offers.forEach(o => {
+    const right = document.createElement('div'); right.className = 'row';
+    right.innerHTML = `<span class="stat">재고 ${o.qty}</span>`;
+    const b = document.createElement('button'); b.className = 'sm'; b.textContent = `1개 ${won(o.price)}`; b.disabled = save.money < o.price;
+    b.onclick = () => { if (save.money < o.price) return; save.money -= o.price; o.qty--; save.inv[o.key] = (save.inv[o.key]||0)+1; sfx.buy(); refreshStoreHUD(); renderWholesale(); persist(); };
+    right.appendChild(b); list.appendChild(plushItem(o.key, right));
+  });
+}
+$('su-whole').onclick = () => { sfx.click(); renderWholesale(); openModal('m-whole'); };
 $('su-help').onclick = () => { sfx.click(); openModal('m-help'); };
 
 // 슬롯 클릭
@@ -140,9 +163,9 @@ function openMachinePanel(i){
   const s = save.slots[i]; if (!s) return;
   const m = MY_MACHINES.find(x => x.id === s.machine);
   $('pm-title').textContent = `${m.name} (자리 ${i+1})`;
-  $('pm-price').value = s.price; $('pm-grip').value = s.grip; $('pm-pity').value = String(s.pity||0);
+  $('pm-price').value = s.price; $('pm-grip').value = s.grip; $('pm-pity').value = String(s.pity||0); $('pm-claw').value = String(s.clawSize||1);
   const draw = () => {
-    const eco = slotEconomy(s);
+    const eco = slotEconomy(s, save.rep);
     $('pm-stats').innerHTML = `<span class="stat">누적 플레이 ${s.stats.plays}</span><span class="stat">당첨 ${s.stats.wins}</span><span class="stat">매출 ${won(s.stats.revenue)}</span>`;
     $('pm-count').textContent = `${eco.total}/${m.capacity}`;
     $('pm-hint').textContent = eco.total ? `평균 시세 ${won(eco.avg)} · 추천 ${won(Math.round(eco.ev*1.6/100)*100)}` : '';
@@ -170,6 +193,14 @@ function openMachinePanel(i){
   $('pm-price').oninput = () => { s.price = Math.max(100, Math.round((+$('pm-price').value||100)/100)*100); store.refreshStock(i); draw(); refreshStoreHUD(); persist(); };
   $('pm-grip').onchange = () => { s.grip = $('pm-grip').value; draw(); refreshStoreHUD(); persist(); };
   $('pm-pity').onchange = () => { s.pity = +$('pm-pity').value; s.pityCount = 0; draw(); refreshStoreHUD(); persist(); };
+  $('pm-claw').onchange = () => { s.clawSize = +$('pm-claw').value; draw(); refreshStoreHUD(); persist(); };
+  $('pm-try').onclick = () => {
+    const eco = slotEconomy(s, save.rep);
+    if (eco.total <= 0){ toast('인형을 먼저 넣어야 해볼 수 있다.'); return; }
+    sfx.click(); closeModals();
+    const stockList = []; for (const [k,n] of Object.entries(s.stock)) for (let j=0;j<n;j++) stockList.push(k);
+    enterPlay({ ...m, name:`내 ${m.name}`, cost:0, desc:'내 기계 테스트. 뽑으면 창고로 돌아온다 (무료).', grip:s.grip, pity:s.pity||0, clawSize:s.clawSize||1, swing:0.35, stockList }, { own:i });
+  };
   $('pm-sell').onclick = () => {
     if (!confirm('기계를 팔면 안의 인형은 창고로 돌아갑니다. 팔까요?')) return;
     for (const [k,n] of Object.entries(s.stock)) save.inv[k]=(save.inv[k]||0)+n;
@@ -214,7 +245,7 @@ function toggleCam(){ if (play){ play.camIdx = (play.camIdx+1)%3; sfx.click(); $
 let msgT = null;
 function showMsg(t){ const e = $('pu-msg'); if (!t){ e.classList.remove('show'); return; } e.textContent = t; e.classList.add('show'); clearTimeout(msgT); msgT = setTimeout(()=>e.classList.remove('show'), 1800); }
 
-function enterPlay(shop){
+function enterPlay(shop, opts={}){
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xdcefff);
   scene.add(new THREE.HemisphereLight(0xffffff, 0xffd0e0, 0.9));
@@ -228,28 +259,32 @@ function enterPlay(shop){
   let machine;
   machine = new ClawMachine(shop, {
     playCount: save.playCounts[shop.id] || 0,
-    onWin: key => { save.inv[key] = (save.inv[key]||0)+1; save.stats.wins++; showMsg(`🎉 ${PLUSH_TYPES[key].name} 획득!`); toast(`${PLUSH_TYPES[key].name}이(가) 창고에 들어갔다 (${RARITY[PLUSH_TYPES[key].rarity].name})`); persist(); },
-    onPlayEnd: r => { $('pu-start').disabled = !machine.canStart(); $('pu-coin').disabled = false; if (!r.won) showMsg(r.dropped ? '아깝다!' : '헛손질...'); save.playCounts[shop.id] = machine.playCount; persist(); },
+    onWin: key => {
+      save.inv[key] = (save.inv[key]||0)+1; save.stats.wins++;
+      if (opts.own != null){ const sl = save.slots[opts.own]; if (sl && sl.stock[key]){ sl.stock[key]--; if (sl.stock[key] <= 0) delete sl.stock[key]; store.refreshStock(opts.own); } }
+      showMsg(`🎉 ${PLUSH_TYPES[key].name} 획득!`); toast(`${PLUSH_TYPES[key].name}이(가) 창고에 들어갔다 (${RARITY[PLUSH_TYPES[key].rarity].name})`); persist(); },
+    onPlayEnd: r => { $('pu-start').disabled = !machine.canStart(); $('pu-coin').disabled = false; if (!r.won) showMsg(r.dropped ? '아깝다!' : '헛손질...'); if (opts.own == null) save.playCounts[shop.id] = machine.playCount; persist(); },
     onMessage: showMsg,
-    onCredits: c => { $('pu-credit').textContent = `크레딧 ${c}`; $('pu-start').disabled = !(machine && machine.state==='idle' && c>0); },
+    onCredits: c => { $('pu-credit').textContent = opts.own != null ? '무료 테스트' : `크레딧 ${c}`; $('pu-start').disabled = !(machine && machine.state==='idle' && c>0); },
   });
   scene.add(machine.group);
   const topCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 1.12, 6);
   topCam.position.set(0, BASE_H + shop.h + 1, 0); topCam.up.set(0, 0, -1); topCam.lookAt(0, BASE_H, 0);
-  play = { scene, camera, topCam, machine, shop, camIdx:0, camPos:new THREE.Vector3(0, 2.1, 3.1), camLook:new THREE.Vector3(0, 1.45, 0) };
+  if (opts.own != null){ machine.credits = 99; machine.updateDisplay(); }
+  play = { scene, camera, topCam, machine, shop, own:opts.own, camIdx:0, camPos:new THREE.Vector3(0, 2.1, 3.1), camLook:new THREE.Vector3(0, 1.45, 0) };
   camera.position.copy(play.camPos);
   mode = 'play'; renderer.domElement.focus();
   $('store-ui').classList.add('hidden'); $('play-ui').classList.remove('hidden');
   $('pu-shop').textContent = shop.name; $('pu-desc').textContent = shop.desc;
-  $('pu-coin').textContent = `💰 ${won(shop.cost)} 넣기`; $('pu-coin').disabled = false;
-  $('pu-credit').textContent = '크레딧 0'; $('pu-start').disabled = true; $('pu-cam').textContent = '📷 정면';
+  $('pu-coin').textContent = `💰 ${won(shop.cost)} 넣기`; $('pu-coin').disabled = false; $('pu-coin').classList.toggle('hidden', opts.own != null);
+  $('pu-credit').textContent = opts.own != null ? '무료 테스트' : '크레딧 0'; $('pu-start').disabled = opts.own == null; $('pu-cam').textContent = '📷 정면';
   refreshStoreHUD();
 }
 function exitPlay(){
   if (!play) return;
-  if (play.machine.credits > 0){ save.money += play.machine.credits * play.shop.cost; toast('남은 크레딧을 환불받았다.'); }
+  if (play.own == null && play.machine.credits > 0){ save.money += play.machine.credits * play.shop.cost; toast('남은 크레딧을 환불받았다.'); }
   sfx.motor(false);
-  save.playCounts[play.shop.id] = play.machine.playCount;
+  if (play.own == null) save.playCounts[play.shop.id] = play.machine.playCount;
   play = null; mode = 'store';
   $('play-ui').classList.add('hidden'); $('store-ui').classList.remove('hidden');
   refreshStoreHUD(); persist();
@@ -264,7 +299,7 @@ function exitPlay(){
     if (!s) return;
     let acc = 0;
     for (let t=0; t<mins; t++){
-      const eco = slotEconomy(s); if (eco.total <= 0) break;
+      const eco = slotEconomy(s, save.rep); if (eco.total <= 0) break;
       const plays = eco.rate; earned += plays*s.price; s.stats.plays += Math.round(plays); s.stats.revenue += plays*s.price;
       acc += plays*eco.winRate;
       while (acc >= 1){ acc -= 1; const keys = Object.keys(s.stock).filter(k=>s.stock[k]>0); if (!keys.length) break; const k = keys[Math.floor(Math.random()*keys.length)]; s.stock[k]--; if (s.stock[k]<=0) delete s.stock[k]; s.stats.wins++; lost.push(PLUSH_TYPES[k].name); }
@@ -281,7 +316,9 @@ function exitPlay(){
 let last = performance.now();
 function loop(now){
   requestAnimationFrame(loop);
-  const dt = Math.min(0.1, (now - last)/1000); last = now;
+  const dt = Math.min(0.1, Math.max(0, (now - last)/1000)); last = now;
+  // 리사이즈 이벤트를 놓쳐도(숨겨진 탭 등) 크기를 맞춘다
+  if (renderer.domElement.width !== Math.floor(innerWidth*renderer.getPixelRatio()) || renderer.domElement.height !== Math.floor(innerHeight*renderer.getPixelRatio())) resize();
   store.sim(dt, mode === 'store');
   if (mode === 'store'){
     store.update(dt);
@@ -314,4 +351,4 @@ function loop(now){
 }
 refreshStoreHUD();
 requestAnimationFrame(loop);
-window.__game = { save, store, get play(){ return play; }, enterPlay, exitPlay, input };
+window.__game = { save, store, get play(){ return play; }, enterPlay, exitPlay, input, loop };

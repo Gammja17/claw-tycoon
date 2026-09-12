@@ -53,6 +53,7 @@
   #keys { position:fixed; bottom:206px; left:18px; font-size:12px; color:#7a5a6a; background:rgba(255,255,255,.7); border-radius:10px; padding:6px 10px; }
   .float { position:fixed; transform:translate(-50%,-50%); font-size:20px; color:#1f9d55; text-shadow:0 2px 0 #fff, 0 0 8px #fff; pointer-events:none; animation:floatUp 1.6s ease-out forwards; white-space:nowrap; }
   .float.win { color:var(--pink); font-size:22px; }
+  .float.bad { color:#d13a3a; font-size:18px; }
   @keyframes floatUp { 0%{opacity:0; margin-top:10px} 15%{opacity:1} 100%{opacity:0; margin-top:-60px} }
   #toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(59,42,58,.92); color:#fff; padding:10px 18px; border-radius:14px; font-size:16px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; }
   #toast.show { opacity:1; }
@@ -72,8 +73,10 @@
   <div class="topbar">
     <div class="chip money" id="su-money">0원</div>
     <div class="chip" id="su-info">기계 0대</div>
+    <div class="chip" id="su-rep">⭐ 3.0</div>
     <div class="spacer"></div>
     <button id="su-trip">🚌 원정 가기</button>
+    <button class="ghost" id="su-whole">🚚 도매</button>
     <button class="ghost" id="su-inv">📦 창고</button>
     <button class="ghost" id="su-help">❓</button>
   </div>
@@ -136,14 +139,25 @@
   <h2 id="pm-title">기계</h2>
   <div id="pm-stats"></div>
   <div class="row">플레이 가격 <input id="pm-price" type="number" step="100" min="100"> 원 <span class="hint" id="pm-hint"></span></div>
-  <div class="row">집게 세팅 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
-    피티 <select id="pm-pity"><option value="0">없음</option><option value="10">10판</option><option value="20">20판</option><option value="30">30판</option><option value="50">50판</option></select></div>
+  <div class="row">집게 힘 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
+    피티 <select id="pm-pity"><option value="0">없음</option><option value="10">10판</option><option value="20">20판</option><option value="30">30판</option><option value="50">50판</option></select>
+    집게 크기 <select id="pm-claw"><option value="1">보통</option><option value="0.65">작은 집게</option></select></div>
   <div class="hint" id="pm-eco"></div>
+  <div class="hint">느슨하면 손님이 "너무해"라며 평점을 깎고 발길이 준다. 짱짱하면 인형이 빨리 빠져나가지만 평점이 오른다.</div>
+  <div class="row"><button class="ghost" id="pm-try">🕹 내 기계 직접 해보기 (무료)</button></div>
   <h3>기계 안 인형 (<span id="pm-count"></span>)</h3>
   <div id="pm-stock" class="list"></div>
   <h3>창고에서 넣기</h3>
   <div id="pm-inv" class="list"></div>
   <div class="row" style="margin-top:12px"><button class="ghost" id="pm-sell">기계 팔기 (50%)</button></div>
+</div>
+
+<!-- 도매 -->
+<div id="m-whole" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>🚚 도매 시장</h2>
+  <div class="hint">10분마다 물건이 바뀐다. 일반·고급 인형만 취급. 희귀·전설은 원정 가서 직접 뽑아야 한다. <span id="whole-timer"></span></div>
+  <div id="whole-list" class="list" style="margin-top:10px"></div>
 </div>
 
 <!-- 도움말 -->
@@ -155,8 +169,9 @@
     2. 뽑은 인형은 <b>창고</b>로. 직접 팔거나 내 기계에 넣는다.<br>
     3. 빈 자리를 클릭해 <b>기계</b>를 사고, 인형을 넣고 가격·집게 세팅을 정하면 손님이 온다.<br>
     4. 손님은 기대값(당첨률×인형시세 ÷ 가격)이 높을수록 많이 온다. 너무해 세팅은 손님이 안 온다.<br><br>
-    <b>뽑기 팁</b>: 집게가 느슨한 곳은 들고 가다 떨어진다. 상품구 바로 옆 인형을 노리거나, 떨어뜨려 탑을 쌓거나, 내려오는 집게로 밀어 넣어라.
-    작은 집게는 큰 인형이 안 잡힌다. 회오리는 올라가며 돌아서 인형이 날아간다. 피티 기계는 카운터를 세라.
+    <b>뽑기 팁</b>: 집게는 진짜 물리로 잡는다. 손가락이 인형 아래를 걸어야 들리고, 집게 힘이 인형 무게를 못 버티면 손가락이 벌어지며 흘러내린다.
+    정중앙·위에 얹힌 인형이 잘 잡힌다. 느슨한 곳은 들고 가다 떨어지니 상품구 옆 인형을 밀거나 탑을 쌓아라. 작은 집게는 큰 인형을 못 감싼다.
+    <b>회오리</b>: 조이스틱을 0.5초 간격으로 좌우 반전하면 집게가 크게 흔들린다. 흔들리는 채로 내리면 인형을 쳐서 밀거나 착지 위치를 바꿀 수 있다. 피티 기계는 LED 카운터를 세라.
   </div>
 </div>
 

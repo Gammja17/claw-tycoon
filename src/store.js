@@ -9,7 +9,7 @@ const DOOR = new THREE.Vector3(0, 0, 4.6);
 const PASTELS = [0xffb3c6, 0xa0d8ff, 0xc3f0a8, 0xffe08a, 0xd9b8ff, 0xffc39a];
 
 // 슬롯 하나의 수익 정보
-export function slotEconomy(slot){
+export function slotEconomy(slot, rep){
   const m = MY_MACHINES.find(x => x.id === slot.machine);
   const total = Object.values(slot.stock).reduce((a,b)=>a+b, 0);
   let avg = 0;
@@ -17,12 +17,13 @@ export function slotEconomy(slot){
     let sum = 0; for (const [k,n] of Object.entries(slot.stock)) sum += RARITY[PLUSH_TYPES[k].rarity].value * n;
     avg = sum/total;
   }
-  const winRate = CUSTOMER_WINRATE[slot.grip] + (slot.pity ? 1/slot.pity : 0);
+  const winRate = CUSTOMER_WINRATE[slot.grip] * ((slot.clawSize||1) < 1 ? 0.6 : 1) + (slot.pity ? 1/slot.pity : 0);
   const ev = winRate * avg;                       // 손님 기대값
   const fairness = slot.price > 0 ? ev/slot.price : 0;
-  const mult = total > 0 ? clamp(fairness*2.5, 0.03, 2.5) : 0;
+  const repMult = 0.35 + 0.65*((rep ?? 3)/5);     // 평점 낮으면 손님이 안 온다
+  const mult = total > 0 ? clamp(fairness*2.5, 0.03, 2.5) * repMult : 0;
   const rate = m.baseRate * mult;                 // 손님/분
-  return { m, total, avg, winRate, ev, fairness, rate, profitPerMin: rate*(slot.price - winRate*avg) };
+  return { m, total, avg, winRate, ev, fairness, rate, repMult, profitPerMin: rate*(slot.price - winRate*avg) };
 }
 
 export class StoreScene {
@@ -109,7 +110,7 @@ export class StoreScene {
   sim(dt, visuals){
     this.save.slots.forEach((data, i) => {
       if (!data) return;
-      const eco = slotEconomy(data);
+      const eco = slotEconomy(data, this.save.rep);
       if (eco.total <= 0 || eco.rate <= 0) return;
       if (Math.random() < eco.rate/60*dt && this.customers.length < 10){
         const apply = () => this.customerPlay(i);
@@ -122,9 +123,17 @@ export class StoreScene {
     const eco = slotEconomy(data); if (eco.total <= 0) return null;
     this.save.money += data.price; data.stats.plays++; data.stats.revenue += data.price;
     data.pityCount = (data.pityCount||0) + 1;
-    let win = Math.random() < CUSTOMER_WINRATE[data.grip];
+    let win = Math.random() < CUSTOMER_WINRATE[data.grip] * ((data.clawSize||1) < 1 ? 0.6 : 1);
     if (data.pity && data.pityCount >= data.pity){ win = true; }
-    let key = null;
+    let key = null, complaint = false;
+    // 평점: 당첨이면 오르고, 꽝이면 조금 내림. 너무해(느슨) 세팅은 불만이 터진다
+    const rep = this.save.rep ?? 3;
+    if (win) this.save.rep = Math.min(5, rep + 0.03);
+    else {
+      let d = data.grip === 'loose' ? 0.012 : data.grip === 'strong' ? 0.003 : 0.006;
+      if (data.grip === 'loose' && Math.random() < 0.1){ complaint = true; d += 0.08; }
+      this.save.rep = Math.max(1, rep - d);
+    }
     if (win){
       data.pityCount = 0;
       const keys = Object.keys(data.stock).filter(k => data.stock[k] > 0);
@@ -134,7 +143,7 @@ export class StoreScene {
       this.refreshStock(i);
     } else if (this.slots[i].cab) this.slots[i].cab.display.setText(`${won(data.price)}  PLAY ${data.stats.plays}`);
     this.hooks.onChange();
-    return { win, key, price:data.price };
+    return { win, key, price:data.price, complaint };
   }
   spawnCustomer(i, apply){
     const s = this.slots[i], data = this.save.slots[i];
@@ -176,6 +185,7 @@ export class StoreScene {
           if (res){
             this.hooks.floatText(pos, '+' + won(res.price), 'money'); sfx.cash();
             if (res.win) this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '🎉 ' + PLUSH_TYPES[res.key].name + ' 당첨!', 'win');
+            else if (res.complaint) this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '😡 너무해!! 집게 뭐야', 'bad');
           }
           cu.phase = 'out';
           if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }

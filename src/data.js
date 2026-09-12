@@ -23,29 +23,30 @@ export const RARITY = [
 ];
 export const RARITY_WEIGHT = [6, 3, 1.4, 0.5];
 
-// 집게 세팅 프리셋
-// grip: 집게 힘(상대값). 인형 하중은 대략 size^2 * 4 정도라 1.0 인형 ≈ 4
-// gripVar: 매판 랜덤 변동폭. pity: N판마다 1번 짱짱(0이면 없음). clawSize: 집게 크기 배율. spin: 회오리 회전
+// 집게 세팅 프리셋: torque = 손가락 모터 토크(N·m). 인형은 손가락 마찰로만 잡힌다.
+// 인형 1개 무게 ≈ 4N, 지렛대 0.15m 기준 3손가락이 버티려면 토크 ≈ 0.25 이상 필요
+// 측정: 들어올린 인형이 손가락 하나에 주는 준정적 반력 ≈ 곰/토끼 0.25, 판다 0.35, 용 0.45 N·m
 export const GRIP_PRESETS = {
-  loose:  { label:'느슨함 (너무해)', grip:2.4, gripVar:0.9 },
-  normal: { label:'보통',           grip:3.6, gripVar:0.8 },
-  strong: { label:'짱짱함',         grip:6.5, gripVar:0.6 },
+  loose:  { label:'느슨함 (너무해)', torque:0.15, torqueVar:0.2 },
+  normal: { label:'보통',           torque:0.32, torqueVar:0.15 },
+  strong: { label:'짱짱함',         torque:0.7,  torqueVar:0.1 },
 };
 
 // 다른 가게들 (원정)
+// swing: 케이블 감쇠(작을수록 회오리(스윙) 테크닉이 잘 먹힘). pity: N판마다 1번 토크 4배. clawSize: 집게 크기
 export const SHOPS = [
-  { id:'stationery', name:'동네 문방구 뽑기', cost:500, desc:'집게가 너무 느슨하다. 입구 근처 인형을 밀어 넣거나 탑을 쌓는 게 답.',
-    grip:'loose', pity:0, clawSize:1.0, spin:false, pool:['bear','bunny','duck'], count:20, color:0xff8fab, w:1.5,d:1.1,h:1.65 },
-  { id:'station', name:'역전 뽑기샵', cost:1000, desc:'평소엔 느슨. 소문으로는 30판마다 한 번 꽉 잡아준다고... 카운터 표시 있음.',
-    grip:'loose', pity:30, clawSize:1.0, spin:false, pool:['bear','bunny','duck','cat','frog','penguin'], count:18, color:0x7cc6fe, w:1.6,d:1.2,h:1.75 },
-  { id:'tiny', name:'작은집게 오락실', cost:500, desc:'집게가 작다. 큰 인형은 아예 안 잡히고 작은 인형만 노려야 함.',
-    grip:'normal', pity:0, clawSize:0.65, spin:false, pool:['duck','bunny','bear','panda'], count:18, color:0xa0e7a0, w:1.5,d:1.1,h:1.65 },
-  { id:'tornado', name:'회오리 크레인', cost:1000, desc:'집게가 올라가면서 빙글빙글 돈다. 원심력에 인형이 날아간다. 방향을 잘 재면...',
-    grip:'normal', pity:0, clawSize:1.0, spin:true, pool:['cat','frog','penguin','unicorn'], count:16, color:0xb28dff, w:1.6,d:1.2,h:1.75 },
-  { id:'strong', name:'짱짱 프리미엄', cost:2000, desc:'집게가 짱짱하다. 대신 비싸고 인형이 크고 무겁다.',
-    grip:'strong', pity:0, clawSize:1.0, spin:false, pool:['panda','unicorn','penguin','dragon'], count:14, color:0xffb36b, w:1.7,d:1.3,h:1.85 },
+  { id:'stationery', name:'동네 문방구 뽑기', cost:500, desc:'집게가 너무 느슨하다. 들어올리면 흘러내린다. 상품구 옆 인형을 밀거나, 떨어뜨려 탑을 쌓거나, 흔들어서 쳐 넣어라.',
+    grip:'loose', pity:0, clawSize:1.0, swing:0.35, pool:['bear','bunny','duck'], count:20, color:0xff8fab, w:1.5,d:1.1,h:1.65 },
+  { id:'station', name:'역전 뽑기샵', cost:1000, desc:'평소엔 느슨. 소문으로는 30판마다 한 번 꽉 잡아준다고... LED 카운터를 세라.',
+    grip:'loose', pity:30, clawSize:1.0, swing:0.35, pool:['bear','bunny','duck','cat','frog','penguin'], count:18, color:0x7cc6fe, w:1.6,d:1.2,h:1.75 },
+  { id:'tiny', name:'작은집게 오락실', cost:500, desc:'집게가 작다. 큰 인형은 손가락이 감싸지 못해 빠진다. 오리처럼 작은 인형을 정중앙으로.',
+    grip:'normal', pity:0, clawSize:0.65, swing:0.35, pool:['duck','bunny','bear','panda'], count:18, color:0xa0e7a0, w:1.5,d:1.1,h:1.65 },
+  { id:'tornado', name:'회오리 크레인', cost:1000, desc:'케이블이 길고 잘 흔들린다. 조이스틱을 빠르게 흔들어 집게를 스윙시킨 채 내리면 인형을 쳐서 날릴 수 있다.',
+    grip:'normal', pity:0, clawSize:1.0, swing:0.06, cable:0.32, pool:['cat','frog','penguin','unicorn'], count:16, color:0xb28dff, w:1.6,d:1.2,h:1.75 },
+  { id:'strong', name:'짱짱 프리미엄', cost:2000, desc:'집게가 짱짱하다. 정중앙으로 집으면 웬만하면 온다. 대신 비싸고 인형이 크고 무겁다.',
+    grip:'strong', pity:0, clawSize:1.0, swing:0.35, pool:['panda','unicorn','penguin','dragon'], count:14, color:0xffb36b, w:1.7,d:1.3,h:1.85 },
   { id:'legend', name:'전설의 황금기계', cost:5000, desc:'느슨한데 20판 피티가 있다는 소문. 황금곰이 산다.',
-    grip:'loose', pity:20, clawSize:1.1, spin:false, pool:['panda','unicorn','dragon','goldbear'], count:10, color:0xffd166, w:1.8,d:1.4,h:1.85 },
+    grip:'loose', pity:20, clawSize:1.1, swing:0.35, pool:['panda','unicorn','dragon','goldbear'], count:10, color:0xffd166, w:1.8,d:1.4,h:1.85 },
 ];
 
 // 내 가게에서 살 수 있는 기계
@@ -54,8 +55,15 @@ export const MY_MACHINES = [
   { id:'mid',   name:'중형 크레인', price:120000, capacity:14, baseRate:5, color:0x8fd3ff, w:1.6,d:1.2,h:1.4 },
   { id:'big',   name:'대형 크레인', price:350000, capacity:24, baseRate:8, color:0xffe08a, w:1.9,d:1.4,h:1.6 },
 ];
-// 손님이 이길 확률(집게 세팅별)
+// 손님이 이길 확률(집게 세팅별). 작은 집게면 ×0.6
 export const CUSTOMER_WINRATE = { loose:0.05, normal:0.13, strong:0.32 };
+// 도매 시장: 10분마다 일반/고급 인형 입고 (희귀·전설은 원정 전용)
+export const WHOLESALE_INTERVAL = 10*60*1000;
+export function makeWholesaleOffers(){
+  const keys = Object.keys(PLUSH_TYPES).filter(k => PLUSH_TYPES[k].rarity <= 1);
+  const pick = [...keys].sort(() => Math.random()-0.5).slice(0, 4);
+  return pick.map(k => { const r = PLUSH_TYPES[k].rarity; return { key:k, qty: r===0 ? 4+Math.floor(Math.random()*4) : 2+Math.floor(Math.random()*3), price: Math.round(RARITY[r].value*(r===0?0.7:0.8)/100)*100 }; });
+}
 export const SLOT_POS = [[-2.7,-1.7],[0,-1.7],[2.7,-1.7],[-2.7,1.1],[0,1.1],[2.7,1.1]];
 
 export function poolWeights(pool){
