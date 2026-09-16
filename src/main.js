@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAVE_KEY, WHOLESALE_INTERVAL, makeWholesaleOffers, won } from './data.js';
+import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAVE_KEY, WHOLESALE_INTERVAL, PROMOS, itemValue, makeWholesaleOffers, won } from './data.js';
 import { ClawMachine, BASE_H } from './machine.js';
 import { StoreScene, slotEconomy } from './store.js';
 import { box, clamp, lerp } from './util.js';
@@ -13,6 +13,8 @@ function loadSave(){
   s.slots = s.slots.map(sl => sl ? { grip:'normal', pity:0, pityCount:0, clawSize:1, ...sl, stats:{plays:0,wins:0,revenue:0, ...(sl.stats||{})} } : null);
   if (s.rep == null) s.rep = 3;
   if (!s.wholesale) s.wholesale = { time:0, offers:[] };
+  if (!s.reviews) s.reviews = [];
+  if (!s.promo) s.promo = null;
   return s;
 }
 const save = loadSave();
@@ -41,7 +43,7 @@ let toastT = null;
 function toast(t){ const e = $('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(()=>e.classList.remove('show'), 2200); }
 
 // ---------- 가게 씬 ----------
-const store = new StoreScene(save, { onChange: refreshStoreHUD, floatText });
+const store = new StoreScene(save, { onChange: refreshStoreHUD, floatText, onReview: () => { if (!$('m-reviews').classList.contains('hidden')) renderReviews(); } });
 let mode = 'store';
 let play = null; // { machine, scene, camera, shop, camIdx }
 
@@ -57,9 +59,13 @@ addEventListener('resize', resize); resize();
 function refreshStoreHUD(){
   $('su-money').textContent = won(save.money);
   const n = save.slots.filter(Boolean).length;
-  let rate = 0; save.slots.forEach(s => { if (s) rate += slotEconomy(s, save.rep).profitPerMin; });
+  const pm = store.promoMult();
+  let rate = 0; save.slots.forEach(s => { if (s) rate += slotEconomy(s, save.rep, pm).profitPerMin; });
   $('su-info').textContent = `기계 ${n}대 · 예상 ${won(rate)}/분`;
   $('su-rep').textContent = `⭐ ${save.rep.toFixed(1)}`;
+  const pr = save.promo && save.promo.until > Date.now() ? save.promo : null;
+  $('su-promo-chip').classList.toggle('hidden', !pr);
+  if (pr) $('su-promo-chip').textContent = `📣 ${pr.name} ×${pr.mult} (${Math.ceil((pr.until-Date.now())/60000)}분)`;
   if (mode === 'play') $('pu-money').textContent = won(save.money);
 }
 
@@ -73,8 +79,8 @@ function invTotal(){ return Object.values(save.inv).reduce((a,b)=>a+b,0); }
 function plushItem(key, right){
   const t = PLUSH_TYPES[key], r = RARITY[t.rarity];
   const el = document.createElement('div'); el.className = 'item';
-  el.innerHTML = `<div class="dot" style="background:#${t.color.toString(16).padStart(6,'0')}"></div>
-    <div class="name">${t.name} <span class="tag" style="background:${r.color}">${r.name}</span><div class="sub">시세 ${won(r.value)}</div></div>`;
+  el.innerHTML = `<div class="dot" style="background:#${t.color.toString(16).padStart(6,'0')}">${t.icon ? `<span style="font-size:13px;line-height:22px;display:block;text-align:center">${t.icon}</span>` : ''}</div>
+    <div class="name">${t.name} <span class="tag" style="background:${r.color}">${r.name}</span><div class="sub">시세 ${won(itemValue(key))}</div></div>`;
   if (right) el.appendChild(right);
   return el;
 }
@@ -102,7 +108,7 @@ function renderInv(){
   if (!keys.length) list.innerHTML = '<div class="hint">창고가 비었다. 원정 가서 뽑아오자.</div>';
   keys.sort((a,b)=>PLUSH_TYPES[b].rarity-PLUSH_TYPES[a].rarity).forEach(k => {
     const right = document.createElement('div'); right.className = 'row';
-    const v = RARITY[PLUSH_TYPES[k].rarity].value;
+    const v = itemValue(k);
     right.innerHTML = `<span class="stat">×${save.inv[k]}</span>`;
     const b = document.createElement('button'); b.className = 'sm'; b.textContent = `1개 팔기 ${won(v*0.5)}`;
     b.onclick = () => { save.inv[k]--; if (save.inv[k]<=0) delete save.inv[k]; save.money += v*0.5; sfx.cash(); refreshStoreHUD(); renderInv(); persist(); };
@@ -131,6 +137,40 @@ function renderWholesale(){
 }
 $('su-whole').onclick = () => { sfx.click(); renderWholesale(); openModal('m-whole'); };
 $('su-help').onclick = () => { sfx.click(); openModal('m-help'); };
+// 홍보
+function renderPromo(){
+  const list = $('promo-list'); list.innerHTML = '';
+  const cur = save.promo && save.promo.until > Date.now() ? save.promo : null;
+  $('promo-now').textContent = cur ? `진행 중: ${cur.name} ×${cur.mult}, ${Math.ceil((cur.until-Date.now())/60000)}분 남음` : '진행 중인 홍보 없음';
+  PROMOS.forEach(p => {
+    const el = document.createElement('div'); el.className = 'shop-card';
+    el.innerHTML = `<div class="swatch" style="background:#ffd166;display:flex;align-items:center;justify-content:center;font-size:24px">📣</div><div class="body"><div class="title">${p.name}</div><div class="desc">${p.desc}</div></div>`;
+    const b = document.createElement('button'); b.textContent = won(p.price); b.disabled = save.money < p.price || !!cur;
+    b.onclick = () => {
+      save.money -= p.price; save.promo = { id:p.id, name:p.name, mult:p.mult, until:Date.now() + p.mins*60000 };
+      save.rep = Math.min(5, save.rep + p.rep); sfx.buy(); toast(`${p.name} 시작! ${p.mins}분간 손님 ×${p.mult}`);
+      for (let k=0;k<(p.id==='influ'?4:2);k++) store.addReview('promo', null, 4 + Math.round(Math.random()));
+      refreshStoreHUD(); renderPromo(); persist();
+    };
+    el.appendChild(b); list.appendChild(el);
+  });
+}
+$('su-promo').onclick = () => { sfx.click(); renderPromo(); openModal('m-promo'); };
+// 리뷰
+function renderReviews(){
+  const list = $('review-list'); list.innerHTML = '';
+  const rs = save.reviews || [];
+  const avg = rs.length ? rs.slice(0, 20).reduce((a,r)=>a+r.stars,0)/Math.min(20, rs.length) : 0;
+  $('review-summary').innerHTML = `<span class="stat">가게 평점 ⭐ ${save.rep.toFixed(1)}</span><span class="stat">최근 리뷰 평균 ${avg ? avg.toFixed(1) : '-'}</span><span class="stat">리뷰 ${rs.length}개</span>`;
+  if (!rs.length) list.innerHTML = '<div class="hint">아직 리뷰가 없다. 손님이 다녀가면 달린다.</div>';
+  rs.forEach(r => {
+    const el = document.createElement('div'); el.className = 'item';
+    const ago = Math.max(0, Math.round((Date.now() - r.t)/60000));
+    el.innerHTML = `<div class="name"><b>${r.nick}</b> <span style="color:#f5a623">${'★'.repeat(r.stars)}${'☆'.repeat(5-r.stars)}</span><div>${r.text}</div><div class="sub">${ago < 1 ? '방금' : ago + '분 전'}</div></div>`;
+    list.appendChild(el);
+  });
+}
+$('su-reviews').onclick = () => { sfx.click(); renderReviews(); openModal('m-reviews'); };
 
 // 슬롯 클릭
 let curSlot = -1;
@@ -149,7 +189,7 @@ function openBuyPanel(i){
   MY_MACHINES.forEach(m => {
     const el = document.createElement('div'); el.className = 'shop-card';
     el.innerHTML = `<div class="swatch" style="background:#${m.color.toString(16).padStart(6,'0')}"></div>
-      <div class="body"><div class="title">${m.name}</div><div class="desc">인형 ${m.capacity}개 수납 · 기본 손님 ${m.baseRate}명/분</div></div>`;
+      <div class="body"><div class="title">${m.name}</div><div class="desc">${m.desc ? m.desc + ' ' : ''}상품 ${m.capacity}개 수납 · 기본 손님 ${m.baseRate}명/분</div></div>`;
     const b = document.createElement('button'); b.textContent = won(m.price); b.disabled = save.money < m.price;
     b.onclick = () => {
       save.money -= m.price; save.slots[i] = { machine:m.id, stock:{}, price:1000, grip:'normal', pity:0, pityCount:0, stats:{plays:0,wins:0,revenue:0} };
@@ -164,12 +204,15 @@ function openMachinePanel(i){
   const m = MY_MACHINES.find(x => x.id === s.machine);
   $('pm-title').textContent = `${m.name} (자리 ${i+1})`;
   $('pm-price').value = s.price; $('pm-grip').value = s.grip; $('pm-pity').value = String(s.pity||0); $('pm-claw').value = String(s.clawSize||1);
+  const gacha = m.type === 'gacha';
+  $('pm-clawrow').classList.toggle('hidden', gacha); $('pm-tryrow').classList.toggle('hidden', gacha); $('pm-clawhint').classList.toggle('hidden', gacha);
+  $('pm-gachahint').classList.toggle('hidden', !gacha);
   const draw = () => {
-    const eco = slotEconomy(s, save.rep);
+    const eco = slotEconomy(s, save.rep, store.promoMult());
     $('pm-stats').innerHTML = `<span class="stat">누적 플레이 ${s.stats.plays}</span><span class="stat">당첨 ${s.stats.wins}</span><span class="stat">매출 ${won(s.stats.revenue)}</span>`;
     $('pm-count').textContent = `${eco.total}/${m.capacity}`;
-    $('pm-hint').textContent = eco.total ? `평균 시세 ${won(eco.avg)} · 추천 ${won(Math.round(eco.ev*1.6/100)*100)}` : '';
-    $('pm-eco').textContent = eco.total ? `손님 당첨률 ${(eco.winRate*100).toFixed(0)}% · 손님 ${eco.rate.toFixed(1)}명/분 · 예상 순이익 ${won(eco.profitPerMin)}/분 (매출 ${won(eco.rate*s.price)}/분 − 인형 유출 ${won(eco.rate*eco.winRate*eco.avg)}/분)` : '인형을 넣어야 손님이 온다.';
+    $('pm-hint').textContent = eco.total ? `평균 시세 ${won(eco.avg)} · 추천 ${won(Math.round(eco.ev*(gacha ? 0.75 : 1.6)/100)*100)}` : '';
+    $('pm-eco').textContent = eco.total ? `${gacha ? '무조건 당첨' : `손님 당첨률 ${(eco.winRate*100).toFixed(0)}%`} · 손님 ${eco.rate.toFixed(1)}명/분 · 예상 순이익 ${won(eco.profitPerMin)}/분 (매출 ${won(eco.rate*s.price)}/분 − 상품 유출 ${won(eco.rate*eco.winRate*eco.avg)}/분)` : '상품을 넣어야 손님이 온다.';
     const st = $('pm-stock'); st.innerHTML = '';
     Object.keys(s.stock).filter(k=>s.stock[k]>0).forEach(k => {
       const right = document.createElement('div'); right.className='row';
@@ -196,7 +239,7 @@ function openMachinePanel(i){
   $('pm-claw').onchange = () => { s.clawSize = +$('pm-claw').value; draw(); refreshStoreHUD(); persist(); };
   $('pm-try').onclick = () => {
     const eco = slotEconomy(s, save.rep);
-    if (eco.total <= 0){ toast('인형을 먼저 넣어야 해볼 수 있다.'); return; }
+    if (eco.total <= 0){ toast('상품을 먼저 넣어야 해볼 수 있다.'); return; }
     sfx.click(); closeModals();
     const stockList = []; for (const [k,n] of Object.entries(s.stock)) for (let j=0;j<n;j++) stockList.push(k);
     enterPlay({ ...m, name:`내 ${m.name}`, cost:0, desc:'내 기계 테스트. 뽑으면 창고로 돌아온다 (무료).', grip:s.grip, pity:s.pity||0, clawSize:s.clawSize||1, swing:0.35, stockList }, { own:i });

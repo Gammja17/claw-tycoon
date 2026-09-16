@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { PLUSH_TYPES, GRIP_PRESETS, poolWeights, pickWeighted } from './data.js';
-import { buildPlushMesh, makePlushBody, plushRadius } from './plush.js';
+import { buildPlushMesh, makePlushBody, plushRadius, plushTop, animatePlush } from './plush.js';
 import { box, cyl, sphere, mat, makeTextSprite, clamp, rand } from './util.js';
 import { sfx } from './audio.js';
 
@@ -256,7 +256,7 @@ export class ClawMachine {
   }
   spawnPlushes(){
     const { w, d, pool, count } = this.spec;
-    const weights = pool ? poolWeights(pool) : null;
+    const weights = pool ? poolWeights(pool, this.spec.weights) : null;
     this.plushes = [];
     const list = this.spec.stockList;
     const n = list ? list.length : count;
@@ -274,7 +274,7 @@ export class ClawMachine {
     body.position.set(x, y, z);
     body.quaternion.setFromEuler(rand(-0.4,0.4), rand(0, Math.PI*2), rand(-0.4,0.4));
     this.world.addBody(body); this.cab.interior.add(mesh);
-    const p = { key, mesh, body };
+    const p = { key, mesh, body, prevVel:new CANNON.Vec3() };
     this.plushes.push(p); return p;
   }
   updateDisplay(){
@@ -369,7 +369,8 @@ export class ClawMachine {
     this.readReactions();
   }
   syncMeshes(){
-    for (const p of this.plushes){ p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); }
+    const dt = this.lastDt || 1/60;
+    for (const p of this.plushes){ p.mesh.position.copy(p.body.position); p.mesh.quaternion.copy(p.body.quaternion); animatePlush(p.mesh, p.body.velocity, p.prevVel, dt); p.prevVel.copy(p.body.velocity); }
     const cab = this.cab, L = FINGER_LEN*this.cs;
     const ht = this.headTarget;
     if (ht){ cab.claw.position.set(ht.x, ht.y, ht.z); cab.claw.quaternion.copy(ht.q); }
@@ -394,7 +395,7 @@ export class ClawMachine {
     for (const p of this.plushes){
       const r = plushRadius(p.key), dx = p.body.position.x - this.head.position.x, dz = p.body.position.z - this.head.position.z;
       const dxz = Math.hypot(dx, dz);
-      if (dxz < 0.075*this.cs + r){ const dy = Math.sqrt(Math.max(0, r*r - Math.max(0, dxz - 0.075*this.cs)**2)); top = Math.max(top, p.body.position.y + dy, p.body.position.y + 0.17*PLUSH_TYPES[p.key].size*0.5); }
+      if (dxz < 0.075*this.cs + r){ const dy = Math.sqrt(Math.max(0, r*r - Math.max(0, dxz - 0.075*this.cs)**2)); top = Math.max(top, p.body.position.y + dy, p.body.position.y + plushTop(p.key)*0.3); }
     }
     return top;
   }
@@ -415,7 +416,7 @@ export class ClawMachine {
     return false;
   }
   update(dt, input){
-    dt = Math.min(dt, 0.05); this.time += dt; this.input = input;
+    dt = Math.min(dt, 0.05); this.time += dt; this.input = input; this.lastDt = dt;
     const { w, d } = this.spec;
     switch (this.state){
       case 'aim': {

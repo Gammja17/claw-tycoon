@@ -74,9 +74,12 @@
     <div class="chip money" id="su-money">0원</div>
     <div class="chip" id="su-info">기계 0대</div>
     <div class="chip" id="su-rep">⭐ 3.0</div>
+    <div class="chip hidden" id="su-promo-chip" style="color:#d13a70"></div>
     <div class="spacer"></div>
     <button id="su-trip">🚌 원정 가기</button>
     <button class="ghost" id="su-whole">🚚 도매</button>
+    <button class="ghost" id="su-promo">📣 홍보</button>
+    <button class="ghost" id="su-reviews">💬 리뷰</button>
     <button class="ghost" id="su-inv">📦 창고</button>
     <button class="ghost" id="su-help">❓</button>
   </div>
@@ -139,12 +142,13 @@
   <h2 id="pm-title">기계</h2>
   <div id="pm-stats"></div>
   <div class="row">플레이 가격 <input id="pm-price" type="number" step="100" min="100"> 원 <span class="hint" id="pm-hint"></span></div>
-  <div class="row">집게 힘 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
+  <div class="row" id="pm-clawrow">집게 힘 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
     피티 <select id="pm-pity"><option value="0">없음</option><option value="10">10판</option><option value="20">20판</option><option value="30">30판</option><option value="50">50판</option></select>
     집게 크기 <select id="pm-claw"><option value="1">보통</option><option value="0.65">작은 집게</option></select></div>
   <div class="hint" id="pm-eco"></div>
-  <div class="hint">느슨하면 손님이 "너무해"라며 평점을 깎고 발길이 준다. 짱짱하면 인형이 빨리 빠져나가지만 평점이 오른다.</div>
-  <div class="row"><button class="ghost" id="pm-try">🕹 내 기계 직접 해보기 (무료)</button></div>
+  <div class="hint" id="pm-clawhint">느슨하면 손님이 "너무해"라며 평점을 깎고 발길이 준다. 짱짱하면 인형이 빨리 빠져나가지만 평점이 오른다.</div>
+  <div class="hint hidden" id="pm-gachahint">가챠: 손님은 무조건 하나 받아간다. 가격이 평균 시세보다 비싸면 "바가지" 리뷰가 달린다. 재고 처리에 쓰자.</div>
+  <div class="row" id="pm-tryrow"><button class="ghost" id="pm-try">🕹 내 기계 직접 해보기 (무료)</button></div>
   <h3>기계 안 인형 (<span id="pm-count"></span>)</h3>
   <div id="pm-stock" class="list"></div>
   <h3>창고에서 넣기</h3>
@@ -158,6 +162,22 @@
   <h2>🚚 도매 시장</h2>
   <div class="hint">10분마다 물건이 바뀐다. 일반·고급 인형만 취급. 희귀·전설은 원정 가서 직접 뽑아야 한다. <span id="whole-timer"></span></div>
   <div id="whole-list" class="list" style="margin-top:10px"></div>
+</div>
+
+<!-- 홍보 -->
+<div id="m-promo" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>📣 홍보</h2>
+  <div class="hint" id="promo-now"></div>
+  <div id="promo-list" class="list" style="margin-top:10px"></div>
+</div>
+
+<!-- 리뷰 -->
+<div id="m-reviews" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>💬 손님 리뷰</h2>
+  <div id="review-summary"></div>
+  <div id="review-list" class="list" style="margin-top:10px"></div>
 </div>
 
 <!-- 도움말 -->

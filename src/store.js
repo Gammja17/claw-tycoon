@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { PLUSH_TYPES, RARITY, MY_MACHINES, SLOT_POS, CUSTOMER_WINRATE, GRIP_PRESETS, won } from './data.js';
+import { PLUSH_TYPES, RARITY, MY_MACHINES, SLOT_POS, CUSTOMER_WINRATE, GRIP_PRESETS, itemValue, REVIEWS, NICKS, won } from './data.js';
 import { buildPlushMesh } from './plush.js';
 import { buildCabinet, placeClaw, setClawOpen, BASE_H, CHUTE } from './machine.js';
+import { makeTextSprite as mts } from './util.js';
 import { box, cyl, sphere, mat, makeTextSprite, rand, lerp, clamp } from './util.js';
 import { sfx } from './audio.js';
 
@@ -9,23 +10,43 @@ const DOOR = new THREE.Vector3(0, 0, 4.6);
 const PASTELS = [0xffb3c6, 0xa0d8ff, 0xc3f0a8, 0xffe08a, 0xd9b8ff, 0xffc39a];
 
 // 슬롯 하나의 수익 정보
-export function slotEconomy(slot, rep){
+export function slotEconomy(slot, rep, promo=1){
   const m = MY_MACHINES.find(x => x.id === slot.machine);
   const total = Object.values(slot.stock).reduce((a,b)=>a+b, 0);
   let avg = 0;
   if (total > 0){
-    let sum = 0; for (const [k,n] of Object.entries(slot.stock)) sum += RARITY[PLUSH_TYPES[k].rarity].value * n;
+    let sum = 0; for (const [k,n] of Object.entries(slot.stock)) sum += itemValue(k) * n;
     avg = sum/total;
   }
-  const winRate = CUSTOMER_WINRATE[slot.grip] * ((slot.clawSize||1) < 1 ? 0.6 : 1) + (slot.pity ? 1/slot.pity : 0);
+  const gacha = m.type === 'gacha';
+  const winRate = gacha ? 1 : CUSTOMER_WINRATE[slot.grip] * ((slot.clawSize||1) < 1 ? 0.6 : 1) + (slot.pity ? 1/slot.pity : 0);
   const ev = winRate * avg;                       // 손님 기대값
   const fairness = slot.price > 0 ? ev/slot.price : 0;
   const repMult = 0.35 + 0.65*((rep ?? 3)/5);     // 평점 낮으면 손님이 안 온다
-  const mult = total > 0 ? clamp(fairness*2.5, 0.03, 2.5) * repMult : 0;
+  const mult = total > 0 ? clamp(fairness*(gacha ? 1.3 : 2.5), 0.03, 2.5) * repMult * promo : 0;
   const rate = m.baseRate * mult;                 // 손님/분
-  return { m, total, avg, winRate, ev, fairness, rate, repMult, profitPerMin: rate*(slot.price - winRate*avg) };
+  return { m, total, avg, winRate, ev, fairness, rate, repMult, gacha, profitPerMin: rate*(slot.price - winRate*avg) };
 }
 
+// 가챠 머신 캐비닛
+export function buildGacha(spec){
+  const { w, d, h, color } = spec;
+  const root = new THREE.Group();
+  root.add(box(w, 0.8, d, color, 0, 0.4, 0));
+  root.add(box(w+0.04, 0.08, d+0.04, 0x3b3b48, 0, 0.04, 0));
+  root.add(box(0.26, 0.14, 0.02, 0x22222a, 0, 0.35, d/2+0.011));            // 배출구
+  const knob = cyl(0.07, 0.07, 0.04, 0xffd400, 0, 0.6, d/2+0.03); knob.rotation.x = Math.PI/2; root.add(knob);
+  root.add(box(0.1, 0.02, 0.05, 0x333, 0, 0.6, d/2+0.05));
+  const globe = new THREE.Mesh(new THREE.SphereGeometry(w*0.48, 20, 14), new THREE.MeshStandardMaterial({ color:0xd8f3ff, transparent:true, opacity:0.18, roughness:0.05, side:THREE.DoubleSide, depthWrite:false }));
+  globe.position.y = 0.8 + w*0.48; globe.renderOrder = 20; root.add(globe);
+  root.add(cyl(w*0.2, w*0.2, 0.08, color, 0, 0.8 + w*0.96, 0));
+  const interior = new THREE.Group(); interior.position.y = 0.8 + w*0.48; root.add(interior);
+  const display = mts('0원', { size:54, color:'#ff3a3a', bg:null, width:512, height:128 });
+  display.scale.set(0.34, 0.085, 1); display.position.set(0, 0.2, d/2+0.02); root.add(display);
+  const sign = mts(spec.name, { size:60, color:'#ff4f8b', bg:null, width:640, height:128 });
+  sign.scale.set(1.0, 0.2, 1); sign.position.set(0, 0.8 + w*1.05, 0); root.add(sign);
+  return { root, interior, display, sign, lights:[], dims:{w,d,h}, isGacha:true, globeR:w*0.48 };
+}
 export class StoreScene {
   constructor(save, hooks){
     this.save = save; this.hooks = hooks; // hooks: { onChange(), floatText(pos, text, cls) }
@@ -71,12 +92,12 @@ export class StoreScene {
     if (!data){ s.label.visible = true; s.pad.visible = true; return; }
     const m = MY_MACHINES.find(x => x.id === data.machine);
     const spec = { ...m, name:m.name, clawSize:1 };
-    const cab = buildCabinet(spec);
+    const cab = m.type === 'gacha' ? buildGacha(spec) : buildCabinet(spec);
     cab.root.position.set(s.x, 0, s.z);
     cab.root.traverse(o => { o.userData.slot = i; });
     this.scene.add(cab.root); s.cab = cab;
     s.label.visible = false; s.pad.visible = false;
-    setClawOpen(cab, 1); placeClaw(cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2);
+    if (!cab.isGacha){ setClawOpen(cab, 1); placeClaw(cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
     this.refreshStock(i);
   }
   // 재고 인형을 정적으로 배치
@@ -85,6 +106,17 @@ export class StoreScene {
     s.plushMeshes.forEach(m => s.cab.interior.remove(m)); s.plushMeshes = [];
     const m = MY_MACHINES.find(x => x.id === data.machine);
     const keys = []; for (const [k,n] of Object.entries(data.stock)) for (let j=0;j<n;j++) keys.push(k);
+    if (s.cab.isGacha){ // 캡슐 더미
+      const R = s.cab.globeR;
+      keys.forEach((k, j) => {
+        const c = sphere(0.055, [0xff8fab, 0xffd166, 0x8fd3ff, 0xc3f0a8, 0xd9b8ff][j%5], 0,0,0);
+        const a = rand(0, Math.PI*2), rr = rand(0, R*0.7), layer = Math.floor(j/9);
+        c.position.set(Math.cos(a)*rr, -R*0.6 + layer*0.1 + rand(0,0.04), Math.sin(a)*rr);
+        s.cab.interior.add(c); s.plushMeshes.push(c);
+      });
+      s.cab.display.setText(`${won(data.price)}  x${keys.length}`);
+      return;
+    }
     const cols = Math.max(2, Math.floor((m.w-0.3)/0.3));
     keys.forEach((k, j) => {
       const mesh = buildPlushMesh(k);
@@ -106,11 +138,12 @@ export class StoreScene {
     for (const h of hits){ if (h.object.userData.slot !== undefined) return h.object.userData.slot; }
     return null;
   }
+  promoMult(){ const p = this.save.promo; return (p && p.until > Date.now()) ? p.mult : 1; }
   // ---------- 경제 시뮬 ----------
   sim(dt, visuals){
     this.save.slots.forEach((data, i) => {
       if (!data) return;
-      const eco = slotEconomy(data, this.save.rep);
+      const eco = slotEconomy(data, this.save.rep, this.promoMult());
       if (eco.total <= 0 || eco.rate <= 0) return;
       if (Math.random() < eco.rate/60*dt && this.customers.length < 18){
         const apply = () => this.customerPlay(i);
@@ -125,10 +158,14 @@ export class StoreScene {
     data.pityCount = (data.pityCount||0) + 1;
     let win = Math.random() < CUSTOMER_WINRATE[data.grip] * ((data.clawSize||1) < 1 ? 0.6 : 1);
     if (data.pity && data.pityCount >= data.pity){ win = true; }
+    if (eco.gacha) win = true;
     let key = null, complaint = false;
     // 평점: 당첨이면 오르고, 꽝이면 조금 내림. 너무해(느슨) 세팅은 불만이 터진다
     const rep = this.save.rep ?? 3;
-    if (win) this.save.rep = Math.min(5, rep + 0.03);
+    if (eco.gacha){
+      if (data.price > eco.avg*1.1 && Math.random() < 0.25){ complaint = true; this.save.rep = Math.max(1, rep - 0.05); this.addReview('rip', null, 1); }
+      else this.save.rep = Math.min(5, rep + 0.008);
+    } else if (win) this.save.rep = Math.min(5, rep + 0.03);
     else {
       let d = data.grip === 'loose' ? 0.012 : data.grip === 'strong' ? 0.003 : 0.006;
       if (data.grip === 'loose' && Math.random() < 0.1){ complaint = true; d += 0.08; }
@@ -141,7 +178,14 @@ export class StoreScene {
       data.stock[key]--; if (data.stock[key] <= 0) delete data.stock[key];
       data.stats.wins++;
       this.refreshStock(i);
-    } else if (this.slots[i].cab) this.slots[i].cab.display.setText(`${won(data.price)}  PLAY ${data.stats.plays}`);
+      if (eco.gacha){ if (!complaint && Math.random() < 0.35) this.addReview('gacha', key, 4 + (Math.random()<0.5?1:0)); }
+      else if (Math.random() < 0.6) this.addReview('win', key, 5);
+    } else {
+      if (this.slots[i].cab) this.slots[i].cab.display.setText(`${won(data.price)}  PLAY ${data.stats.plays}`);
+      const anyKey = Object.keys(data.stock)[0];
+      if (complaint) this.addReview('complaint', anyKey, 1);
+      else if (Math.random() < 0.08) this.addReview('lose', anyKey, 2 + Math.floor(Math.random()*2));
+    }
     this.hooks.onChange();
     return { win, key, price:data.price, complaint };
   }
@@ -157,6 +201,16 @@ export class StoreScene {
     g.position.copy(DOOR).add(new THREE.Vector3(rand(-0.5,0.5), 0, rand(0, 0.3)));
     this.scene.add(g);
     return g;
+  }
+  addReview(kind, key, stars){
+    const pool = REVIEWS[kind]; if (!pool) return;
+    const item = key ? PLUSH_TYPES[key].name : '인형';
+    const text = pool[Math.floor(Math.random()*pool.length)].replace(/\{item\}/g, item);
+    const nick = NICKS[Math.floor(Math.random()*NICKS.length)] + Math.floor(Math.random()*90+10);
+    if (!this.save.reviews) this.save.reviews = [];
+    this.save.reviews.unshift({ nick, stars, text, t:Date.now() });
+    if (this.save.reviews.length > 40) this.save.reviews.length = 40;
+    if (this.hooks.onReview) this.hooks.onReview();
   }
   spawnCustomer(i, apply){
     const s = this.slots[i], data = this.save.slots[i];
@@ -175,7 +229,7 @@ export class StoreScene {
   }
   updateWanderers(dt){
     const machines = this.save.slots.filter(Boolean).length;
-    const want = machines === 0 ? 0 : Math.min(14, Math.round(1 + machines*1.5 + (this.save.rep ?? 3)*1.2));
+    const want = machines === 0 ? 0 : Math.min(16, Math.round((1 + machines*1.5 + (this.save.rep ?? 3)*1.2) * Math.min(1.8, this.promoMult())));
     this.wanderT = (this.wanderT || 0) + dt;
     if (this.wanderers.length < want && this.wanderT > 0.8){ this.wanderT = 0; this.wanderers.push({ g:this.makePerson(), target:this.wanderTarget(), wait:0, t:rand(0,10), speed:rand(0.8, 1.3), leaving:false }); }
     if (this.wanderers.length > want && this.wanderT > 0.8){ this.wanderT = 0; const w = this.wanderers.find(x => !x.leaving); if (w){ w.leaving = true; w.target = DOOR.clone(); w.wait = 0; } }
@@ -210,7 +264,7 @@ export class StoreScene {
       } else if (cu.phase === 'play'){
         cu.wait -= dt; cu.g.position.y = bob*0.3;
         const s = this.slots[cu.i];
-        if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m){ const p = 0.5+0.5*Math.sin(cu.t*3); placeClaw(s.cab, lerp(-m.w/4, m.w/4, p), m.h-0.24 - Math.max(0, Math.sin(cu.t*2))*0.4, lerp(-m.d/4, m.d/4, 0.5+0.5*Math.cos(cu.t*2)), 0); } }
+        if (s.cab && !s.cab.isGacha){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m){ const p = 0.5+0.5*Math.sin(cu.t*3); placeClaw(s.cab, lerp(-m.w/4, m.w/4, p), m.h-0.24 - Math.max(0, Math.sin(cu.t*2))*0.4, lerp(-m.d/4, m.d/4, 0.5+0.5*Math.cos(cu.t*2)), 0); } }
         if (cu.wait <= 0){
           const res = cu.apply();
           const pos = cu.g.position.clone().add(new THREE.Vector3(0, 1.3, 0));
@@ -220,8 +274,8 @@ export class StoreScene {
             else if (res.complaint) this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '😡 너무해!! 집게 뭐야', 'bad');
           }
           cu.phase = 'out';
-          if (Math.random() < 0.4){ this.wanderers.push({ g:cu.g, target:this.wanderTarget(), wait:0, t:cu.t, speed:rand(0.8,1.3), leaving:false }); this.customers.splice(k,1); if (s.cab){ const m2 = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m2) placeClaw(s.cab, -m2.w/2+CHUTE/2, m2.h-0.24, m2.d/2-CHUTE/2); } continue; }
-          if (s.cab){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
+          if (Math.random() < 0.4){ this.wanderers.push({ g:cu.g, target:this.wanderTarget(), wait:0, t:cu.t, speed:rand(0.8,1.3), leaving:false }); this.customers.splice(k,1); if (s.cab && !s.cab.isGacha){ const m2 = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m2) placeClaw(s.cab, -m2.w/2+CHUTE/2, m2.h-0.24, m2.d/2-CHUTE/2); } continue; }
+          if (s.cab && !s.cab.isGacha){ const m = MY_MACHINES.find(x => x.id === this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
         }
       }
     }
