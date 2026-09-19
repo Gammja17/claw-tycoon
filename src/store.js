@@ -4,7 +4,7 @@ import { buildPlushMesh } from './plush.js';
 import { buildCabinet, placeClaw, setClawOpen, footprint, BASE_H, CHUTE } from './machine.js';
 import { box, cyl, sphere, makeTextSprite, makeTextPlane, rand, lerp, clamp } from './util.js';
 import { sfx } from './audio.js';
-import { spawn, play as playAnim, tick as tickAnim, fitHeight, has as hasAsset, CHARACTERS } from './assets.js';
+import { spawn, play as playAnim, tick as tickAnim, fitHeight, CHARACTERS } from './assets.js';
 
 const PASTELS = [0xffb3c6, 0xa0d8ff, 0xc3f0a8, 0xffe08a, 0xd9b8ff, 0xffc39a];
 export const machineDef = id => MY_MACHINES.find(x => x.id === id);
@@ -83,20 +83,8 @@ export function buildFacility(m){
   }
   return out;
 }
-// 가게 전시용: Kenney 클로머신 외형 (일반/미니 크레인)
-function buildShell(m){
-  const model = spawn('arcade-claw-machine'); if (!model) return null;
-  const s = (m.w + 2*0.12 + 0.1) / 0.66;
-  model.scale.setScalar(s);
-  const root = new THREE.Group(); root.add(model);
-  const interior = new THREE.Group(); interior.position.y = 0.25*s; root.add(interior);   // 유리 구역 바닥
-  let clawNode = null; model.traverse(o => { if (o.name === 'rotate-y') clawNode = o; });
-  const sign = makeTextSprite(m.name, { size:60, color:'#ff4f8b', bg:null, width:640, height:128 });
-  return { root, interior, sign, display:null, lights:[], dims:{w:m.w, d:m.d, h:m.h}, isShell:true, glassR:0.19*s, glassH:0.3*s, clawNode, scale:s };
-}
 export function buildAnyCabinet(m){
   if (m.type === 'facility') return buildFacility(m);
-  if (m.type === 'claw' && (m.kind === 'claw' || m.kind === 'mini' || !m.kind) && hasAsset('arcade-claw-machine')){ const sh = buildShell(m); if (sh) return sh; }
   const spec = { ...m, name:m.name, clawSize:1 };
   return m.type === 'gacha' ? buildGacha(spec) : buildCabinet(spec);
 }
@@ -215,32 +203,86 @@ export class StoreScene {
     const id = this.save.decor?.env || 'city'; const E = DECOR.env.find(e => e.id === id) || DECOR.env[0];
     this.envDef = E; const F = this.F, W = F.W, D = F.D, zc = -4 + D/2;
     const ground = box(90, 0.05, 90, E.ground, 0, -0.08, zc); ground.receiveShadow = true; this.env.add(ground);
-    if (E.road){ const road = box(90, 0.02, 4, 0x3b3b44, 0, -0.04, F.z1 + 4.2); this.env.add(road); for (let x=-44; x<44; x+=3) this.env.add(box(1.4, 0.005, 0.12, 0xf0e68c, x, -0.02, F.z1 + 4.2)); this.env.add(box(90, 0.03, 1.6, 0xc9c4bd, 0, -0.04, F.z1 + 1.4)); }
+    const fz = F.z1 + 0.7;                 // 앞 유리벽
+    const curb = fz + 2.3;                 // 인도 끝(도로 시작)
+    if (E.road){
+      this.env.add(box(90, 0.03, 2.3, 0xc9c4bd, 0, -0.04, fz + 1.15));                       // 가게 앞 인도
+      const road = box(90, 0.02, 5, 0x3b3b44, 0, -0.045, curb + 2.5); this.env.add(road);     // 도로
+      for (let x=-44; x<44; x+=3) this.env.add(box(1.4, 0.005, 0.12, 0xf0e68c, x, -0.03, curb + 2.5));
+      this.env.add(box(90, 0.03, 1.8, 0xc9c4bd, 0, -0.04, curb + 5.9));                       // 건너편 인도
+      this.env.add(box(2.0, 0.006, 5, 0xe8e2da, 0, -0.03, curb + 2.5));                       // 횡단보도
+      for (let z=0.4; z<5; z+=0.8) this.env.add(box(1.6, 0.007, 0.35, 0x3b3b44, 0, -0.028, curb + z));
+    }
     if (id === 'none') return;
-    const put = (name, x, z, h, rot=0) => { const m = spawn(name); if (!m) return null; fitHeight(m, h); m.position.set(x, 0, z); m.rotation.y = rot; this.env.add(m); return m; };
-    const rnd = (a) => a[Math.floor(Math.random()*a.length)];
     let seed = 7; const srand = () => { seed = (seed*9301 + 49297) % 233280; return seed/233280; };
     const pick = (a) => a[Math.floor(srand()*a.length)];
+    const GAP = 2.4;                       // 가게 벽과 건물 사이 여유
+    // 한 방향으로 건물을 실제 크기대로 이어 붙인다. side: back(뒤, z 최대면=line) / left / right / front
+    const row = (names, side, line, start, end, hFn, rot) => {
+      let a = start;
+      while (a < end){
+        const m = spawn(pick(names)); if (!m) return;
+        fitHeight(m, hFn()); m.rotation.y = rot; m.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(m); const sz = bb.getSize(new THREE.Vector3());
+        const ext = (side === 'back' || side === 'front') ? sz.x : sz.z;
+        if (a + ext > end + 1.5) { break; }
+        if (side === 'back'){ m.position.set(a + ext/2 - (bb.min.x + sz.x/2), 0, line - bb.max.z); }
+        else if (side === 'front'){ m.position.set(a + ext/2 - (bb.min.x + sz.x/2), 0, line - bb.min.z); }
+        else if (side === 'left'){ m.position.set(line - bb.max.x, 0, a + ext/2 - (bb.min.z + sz.z/2)); }
+        else { m.position.set(line - bb.min.x, 0, a + ext/2 - (bb.min.z + sz.z/2)); }
+        this.env.add(m); a += ext + 0.4 + srand()*0.6;
+      }
+    };
+    const put = (name, x, z, h, rot=0) => { const m = spawn(name); if (!m) return null; fitHeight(m, h); m.position.set(x, 0, z); m.rotation.y = rot; this.env.add(m); return m; };
+    // 거리 소품: 전봇대(전선 포함)·가로등·가로수
+    const street = (treeName, treeH) => {
+      const poleX = []; for (let x = -W/2 - 6; x <= W/2 + 6; x += 6) if (Math.abs(x) > 1.8) poleX.push(x);
+      const mat = new THREE.MeshStandardMaterial({ color:0x6e6259, roughness:0.9 });
+      const wireMat = new THREE.LineBasicMaterial({ color:0x2a2a33 });
+      const tops = [];
+      poleX.forEach(x => {
+        const g = new THREE.Group(); g.position.set(x, 0, curb - 0.25);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.6, 8), mat); pole.position.y = 2.3; pole.castShadow = true; g.add(pole);
+        g.add(box(1.1, 0.08, 0.08, 0x6e6259, 0, 4.2, 0)); g.add(box(0.9, 0.06, 0.06, 0x6e6259, 0, 3.85, 0));
+        [-0.45, 0, 0.45].forEach(o => g.add(cyl(0.035, 0.035, 0.1, 0xdddddd, o, 4.29, 0, 6)));
+        g.add(box(0.2, 0.45, 0.2, 0x8b8b95, 0.18, 3.5, 0)); // 변압기
+        this.env.add(g); tops.push(new THREE.Vector3(x, 4.29, curb - 0.25));
+      });
+      for (let i=1;i<tops.length;i++){ const a = tops[i-1], b = tops[i]; if (b.x - a.x > 7) continue; [-0.45, 0, 0.45].forEach(o => { const pts = []; for (let t=0;t<=8;t++){ const u = t/8; pts.push(new THREE.Vector3(lerp(a.x, b.x, u) + o, a.y - Math.sin(u*Math.PI)*0.25, a.z)); } this.env.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wireMat)); }); }
+      // 가로등 (전봇대 사이) + 실제 조명 몇 개
+      let lights = 0;
+      for (let x = -W/2 - 3; x <= W/2 + 3; x += 6){ if (Math.abs(x) < 1.8) continue;
+        const g = new THREE.Group(); g.position.set(x, 0, curb - 0.3);
+        g.add(cyl(0.05, 0.07, 3.2, 0x3c3c48, 0, 1.6, 0, 8)); g.add(box(0.7, 0.06, 0.06, 0x3c3c48, -0.3, 3.2, 0));
+        const head = box(0.36, 0.12, 0.22, 0xfff1c2, -0.62, 3.18, 0); head.material = new THREE.MeshStandardMaterial({ color:0xfff1c2, emissive:0xffd77a, emissiveIntensity:E.night ? 2.2 : 0.4 }); g.add(head);
+        if (lights < 3 && Math.abs(x) < W/2 + 1){ const pl = new THREE.PointLight(0xffd9a0, E.night ? 14 : 3, 9, 2); pl.position.set(-0.62, 3.0, 0); g.add(pl); lights++; }
+        this.env.add(g);
+      }
+      // 가로수 (문 앞 통로 비움)
+      for (let x = -W/2 - 4.5; x <= W/2 + 4.5; x += 3){ if (Math.abs(x) < 2.0) continue; if (poleX.some(p => Math.abs(p - x) < 0.9)) continue; put(treeName, x, curb - 0.45, treeH + srand()*0.4, srand()*6.28); }
+      for (let x = -W/2 - 6; x <= W/2 + 6; x += 3.5){ if (Math.abs(x) < 1.6) continue; put(treeName, x, curb + 5.9, treeH + srand()*0.5, srand()*6.28); }
+    };
     if (id === 'city' || id === 'night'){
       const B = ['city-building-a','city-building-b','city-building-c','city-building-d','city-building-e','city-building-f','city-building-g','city-building-h'];
       const S = ['city-building-skyscraper-a','city-building-skyscraper-b','city-building-skyscraper-c'];
-      // 뒤쪽 한 줄
-      for (let x=-W/2-4; x<=W/2+4; x+=4.2) put(pick(srand() < 0.3 ? S : B), x, -4 - 3.2, 5 + srand()*4, Math.PI);
-      // 양옆
-      for (let z=-3; z<=F.z1+1; z+=4.2){ put(pick(B), -W/2 - 3.4, z, 4.5 + srand()*3, Math.PI/2); put(pick(B), W/2 + 3.4, z, 4.5 + srand()*3, -Math.PI/2); }
-      // 길 건너
-      for (let x=-W/2-6; x<=W/2+6; x+=4.4) put(pick(srand() < 0.4 ? S : B), x, F.z1 + 9.5, 5 + srand()*5, 0);
-      for (let i=0;i<8;i++) put('town-tree-small', -W/2-2 + i*((W+4)/7), F.z1 + 7.0, 1.8);
+      const mix = [...B, ...B, ...S];
+      row(mix, 'back', -4 - GAP, -W/2 - 8, W/2 + 8, () => 5 + srand()*4, Math.PI);
+      row(B, 'left', -W/2 - GAP, -4 - GAP, fz + 0.3, () => 4.5 + srand()*3, Math.PI/2);
+      row(B, 'right', W/2 + GAP, -4 - GAP, fz + 0.3, () => 4.5 + srand()*3, -Math.PI/2);
+      row(mix, 'front', curb + 7.0, -W/2 - 10, W/2 + 10, () => 5 + srand()*5, 0);
+      street('town-tree-small', 1.6);
     } else if (id === 'town'){
       const H = ['town-building-type-a','town-building-type-b','town-building-type-c','town-building-type-d','town-building-type-e','town-building-type-f','town-building-type-g','town-building-type-h'];
-      for (let x=-W/2-4; x<=W/2+4; x+=4.6){ put(pick(H), x, -4 - 3.4, 3 + srand()*1.2, Math.PI); put('town-tree-large', x+2.2, -4-2.2, 2.4 + srand()); }
-      for (let z=-3; z<=F.z1+1; z+=4.6){ put(pick(H), -W/2 - 3.6, z, 3 + srand(), Math.PI/2); put(pick(H), W/2 + 3.6, z, 3 + srand(), -Math.PI/2); }
-      for (let x=-W/2-6; x<=W/2+6; x+=4.6) put(pick(H), x, F.z1 + 9.5, 3 + srand()*1.2, 0);
-      for (let x=-W/2-2; x<=W/2+2; x+=1.6) if (Math.abs(x) > 1.4) put('town-fence-1x3', x, F.z1 + 7.0, 0.8);
-      for (let i=0;i<6;i++) put('town-tree-small', -W/2-2 + i*((W+4)/5), F.z1 + 7.6, 1.8);
+      row(H, 'back', -4 - GAP - 0.6, -W/2 - 8, W/2 + 8, () => 3 + srand()*1.2, Math.PI);
+      row(H, 'left', -W/2 - GAP - 0.6, -4 - GAP, fz + 0.3, () => 3 + srand(), Math.PI/2);
+      row(H, 'right', W/2 + GAP + 0.6, -4 - GAP, fz + 0.3, () => 3 + srand(), -Math.PI/2);
+      row(H, 'front', curb + 7.2, -W/2 - 10, W/2 + 10, () => 3 + srand()*1.2, 0);
+      for (let x=-W/2-8; x<=W/2+8; x+=1.6) if (Math.abs(x) > 1.4) put('town-fence-1x3', x, curb + 6.9, 0.8);
+      for (let x=-W/2-6; x<=W/2+6; x+=4.5) put('town-tree-large', x, -4 - GAP - 0.2, 2.4 + srand());
+      street('town-tree-small', 1.7);
     } else if (id === 'forest'){
       const T = ['nature-tree_default','nature-tree_detailed','nature-tree_fat','nature-tree_oak','nature-tree_pineRoundA','nature-tree_pineTallA','nature-tree_cone'];
-      for (let i=0;i<70;i++){ const ang = srand()*Math.PI*2, r = Math.max(W, D)/2 + 2.5 + srand()*9; const x = Math.cos(ang)*r, z = zc + Math.sin(ang)*r*0.9; if (z > F.z1 + 0.5 && Math.abs(x) < 2.2) continue; put(pick(T), x, z, 2.5 + srand()*3.5, srand()*6.28); }
+      for (let i=0;i<70;i++){ const ang = srand()*Math.PI*2, r = Math.max(W, D)/2 + GAP + 1 + srand()*9; const x = Math.cos(ang)*r, z = zc + Math.sin(ang)*r*0.9; if (z > F.z1 + 0.5 && Math.abs(x) < 2.2) continue; put(pick(T), x, z, 2.5 + srand()*3.5, srand()*6.28); }
       for (let i=0;i<40;i++){ const ang = srand()*Math.PI*2, r = Math.max(W, D)/2 + 1.2 + srand()*10; put(pick(['nature-plant_bush','nature-plant_bushLarge','nature-rock_smallA','nature-rock_largeA','nature-grass_large','nature-flower_redA','nature-flower_yellowA','nature-flower_purpleA']), Math.cos(ang)*r, zc + Math.sin(ang)*r*0.9, 0.35 + srand()*0.6, srand()*6.28); }
       for (let x=-1.2; x<=1.2; x+=0.8) put('nature-path_stone', x, F.z1 + 1.2, 0.05);
     }
@@ -313,8 +355,7 @@ export class StoreScene {
     this.slots[i] = s;
     if (cab.claw){ setClawOpen(cab, 1); placeClaw(cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
     // 고장 표시
-    const warnY = cab.isShell ? 0.65*cab.scale + 0.45 : BASE_H + m.h + 0.75;
-    const warn = makeTextSprite('⚠ 고장', { size:60, color:'#fff', bg:'rgba(239,68,68,0.95)', width:384, height:128 }); warn.scale.set(0.9, 0.3, 1); warn.position.set(0, warnY, 0); warn.visible = !!data.broken; cab.root.add(warn); s.warn = warn;
+    const warn = makeTextSprite('⚠ 고장', { size:60, color:'#fff', bg:'rgba(239,68,68,0.95)', width:384, height:128 }); warn.scale.set(0.9, 0.3, 1); warn.position.set(0, BASE_H + m.h + 0.75, 0); warn.visible = !!data.broken; cab.root.add(warn); s.warn = warn;
     this.refreshStock(i);
     if (!skipNav) this.buildNav();
   }
@@ -338,11 +379,6 @@ export class StoreScene {
       return;
     }
     const kind = m.kind || 'claw';
-    if (s.cab.isShell){ // 케니 외형: 유리 구역 안에 배치
-      const R = s.cab.glassR - 0.16, cols = Math.max(1, Math.floor(2*R/0.3)+1);
-      keys.forEach((k, j) => { const mesh = buildPlushMesh(k); const col = j % cols, row = Math.floor(j/cols); const layer = Math.floor(row/cols), r2 = row % cols; mesh.position.set(clamp(-R + col*0.3 + rand(-0.03,0.03), -R, R), 0.14 + layer*0.28, clamp(-R + r2*0.3 + rand(-0.03,0.03), -R, R)); mesh.rotation.y = rand(0, Math.PI*2); mesh.scale.setScalar(0.85); s.cab.interior.add(mesh); s.plushMeshes.push(mesh); });
-      return;
-    }
     if (kind === 'ufo'){ keys.slice(0,6).forEach((k, j) => { const mesh = buildPlushMesh(k); mesh.position.set(-m.w/2+0.3 + j*0.22, 0.4, 0); mesh.rotation.x = Math.PI/2; s.cab.interior.add(mesh); s.plushMeshes.push(mesh); }); }
     else if (kind === 'pusher'){ keys.slice(0,6).forEach((k, j) => { const mesh = buildPlushMesh(k); mesh.position.set(-m.w/2+0.25 + j*0.25, 0.48, -m.d/2+0.42); s.cab.interior.add(mesh); s.plushMeshes.push(mesh); }); }
     else {

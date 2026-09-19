@@ -119,14 +119,14 @@ export const DECOR = {
     { id:'city',   name:'도심 (빌딩가)',   price:0,      sky:0xcfe5ff, ground:0x8d9099, road:true },
     { id:'town',   name:'주택가',          price:200000, sky:0xdff3ff, ground:0x9fd68f, road:true },
     { id:'forest', name:'숲속',            price:300000, sky:0xd8f0e0, ground:0x86c46a, road:false },
-    { id:'night',  name:'야경 (빌딩가)',   price:500000, sky:0x141a33, ground:0x30333d, road:true, night:true },
+    { id:'night',  name:'야경 (빌딩가)',   price:500000, sky:0x232b4d, ground:0x3f4356, road:true, night:true },
     { id:'none',   name:'배경 없음',       price:0,      sky:0xffe9f0, ground:0xf7d9b5, road:false },
   ],
   light: [
     { id:'day',   name:'밝은 낮',     price:0,      hemi:0xffffff, ground:0xffc0cb, sun:0xffffff, sunI:1.4, hemiI:0.9, bg:0xffe9f0, neon:[] },
     { id:'warm',  name:'따뜻한 조명', price:100000, hemi:0xfff0d0, ground:0xffb080, sun:0xffd9a0, sunI:1.2, hemiI:0.8, bg:0xffe4cf, neon:[] },
-    { id:'neon',  name:'네온 오락실', price:350000, hemi:0x8877ff, ground:0x442266, sun:0xffffff, sunI:0.5, hemiI:0.5, bg:0x1a1430, neon:[0xff2d95, 0x2dffec, 0xffe12d, 0xa12dff] },
-    { id:'night', name:'심야 영업',   price:200000, hemi:0x6677aa, ground:0x223355, sun:0x99aaff, sunI:0.6, hemiI:0.6, bg:0x101a33, neon:[0xffd166] },
+    { id:'neon',  name:'네온 오락실', price:350000, hemi:0x8877ff, ground:0x442266, sun:0xffffff, sunI:0.75, hemiI:0.75, bg:0x1a1430, neon:[0xff2d95, 0x2dffec, 0xffe12d, 0xa12dff] },
+    { id:'night', name:'심야 영업',   price:200000, hemi:0x6677aa, ground:0x223355, sun:0x99aaff, sunI:0.85, hemiI:0.85, bg:0x101a33, neon:[0xffd166] },
   ],
 };
 
