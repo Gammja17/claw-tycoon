@@ -4,6 +4,7 @@ import { buildPlushMesh } from './plush.js';
 import { buildCabinet, placeClaw, setClawOpen, footprint, BASE_H, CHUTE } from './machine.js';
 import { box, cyl, sphere, makeTextSprite, makeTextPlane, rand, lerp, clamp } from './util.js';
 import { sfx } from './audio.js';
+import { spawn, play as playAnim, tick as tickAnim, fitHeight, CHARACTERS } from './assets.js';
 
 const PASTELS = [0xffb3c6, 0xa0d8ff, 0xc3f0a8, 0xffe08a, 0xd9b8ff, 0xffc39a];
 export const machineDef = id => MY_MACHINES.find(x => x.id === id);
@@ -65,6 +66,9 @@ export function buildFacility(m){
     out.door = door;
     const sg = makeTextSprite('🚻 화장실', { size:60, color:'#2563eb', bg:'rgba(255,255,255,0.95)', width:512, height:128 }); sg.scale.set(0.9, 0.22, 1); sg.position.set(0, h+0.2, d/2); root.add(sg);
     out.sign = sg;
+  } else if (m.kind === 'vending' && spawn('arcade-vending-machine')){
+    const mv = spawn('arcade-vending-machine'); fitHeight(mv, h); root.add(mv);
+    const sg = makeTextSprite('🥤 음료', { size:60, color:'#fff', bg:null, width:512, height:128 }); sg.scale.set(0.6, 0.15, 1); sg.position.set(0, h+0.1, d/2); root.add(sg);
   } else if (m.kind === 'vending'){
     root.add(box(w, h, d, color, 0, h/2, 0));
     root.add(box(w*0.8, h*0.55, 0.02, 0x9be7ff, 0, h*0.62, d/2+0.011, { emissive:0x66ccff, emissiveIntensity:0.5 }));
@@ -105,7 +109,7 @@ export class StoreScene {
     this.sun.shadow.mapSize.set(2048, 2048);
     Object.assign(this.sun.shadow.camera, { left:-10, right:10, top:12, bottom:-12, near:1, far:40 });
     this.scene.add(this.sun);
-    this.neonLights = []; this.room = new THREE.Group(); this.scene.add(this.room); this.tileGroup = new THREE.Group(); this.scene.add(this.tileGroup);
+    this.neonLights = []; this.room = new THREE.Group(); this.scene.add(this.room); this.tileGroup = new THREE.Group(); this.scene.add(this.tileGroup); this.props = new THREE.Group(); this.scene.add(this.props); this.propRects = [];
     this.sign = makeTextPlane('', { size:66, color:'#ff4f8b', bg:'rgba(255,255,255,0.96)', width:900, height:180 }); this.sign.scale.set(4.5, 0.9, 1); this.sign.userData.sign = true; this.scene.add(this.sign);
     this.signBoard = box(4.7, 1.1, 0.08, 0xff8fab, 0, 2.6, -3.93); this.scene.add(this.signBoard);
     this.floor = 0;
@@ -140,6 +144,7 @@ export class StoreScene {
       this.F.stairs = { x0:sx-0.8, x1:sx+0.8, z0:sz-1.1, z1:sz+1.2 };
       if (this.floor > 0) this.DOOR = new THREE.Vector3(sx, 0, sz + 1.0);
     } else this.F.stairs = null;
+    this.buildProps();
     if (this.floor > 0){ const fl = makeTextSprite(`${this.floor+1}F`, { size:70, color:'#fff', bg:'rgba(124,92,255,0.9)', width:256, height:128 }); fl.scale.set(1.0, 0.5, 1); fl.position.set(-W/2+0.9, 2.5, -3.85); this.room.add(fl); }
     this.floorMesh = box(W, 0.1, D, 0xf7d9b5, 0, -0.05, zc); this.floorMesh.receiveShadow = true; this.room.add(this.floorMesh);
     this.walls = [box(W, 3.2, 0.2, 0xcfe8ff, 0, 1.6, -4.0), box(0.2, 3.2, D, 0xcfe8ff, -W/2, 1.6, zc), box(0.2, 3.2, D, 0xcfe8ff, W/2, 1.6, zc)];
@@ -151,6 +156,28 @@ export class StoreScene {
     this.gridHelper = new THREE.GridHelper(Math.max(W, D), Math.max(W, D)*2, 0xff8fab, 0xffc3d6); this.gridHelper.position.set(0, 0.02, zc); this.gridHelper.visible = this.buildMode; this.scene.add(this.gridHelper);
     this.resize(this.aspect, 1);
     this.applyDecor();
+  }
+  // 카운터·기둥·화분 등 장식 (Kenney 모델이 로드돼 있으면 사용)
+  buildProps(){
+    while (this.props.children.length) this.props.remove(this.props.children[0]);
+    this.propRects = [];
+    const F = this.F;
+    const put = (name, x, z, h, rotY=0) => { const m = spawn(name); if (!m) return null; fitHeight(m, h); m.position.set(x, 0, z); m.rotation.y = rotY; this.props.add(m); return m; };
+    if (this.floor === 0){
+      // 카운터 (뒤쪽 왼쪽) — 직원이 뒤에 선다
+      const cx = F.x0 + 1.9, cz = F.z0 + 1.35;
+      const counter = box(2.6, 0.95, 0.7, 0xfff6e8, cx, 0.475, cz); counter.receiveShadow = true; this.props.add(counter);
+      this.props.add(box(2.7, 0.06, 0.8, 0xff8fab, cx, 0.98, cz));
+      const reg = put('arcade-cash-register', cx - 0.7, cz, 0.55); if (reg) reg.position.y = 1.0;
+      const pz = put('arcade-prizes', cx + 0.6, cz, 0.5); if (pz) pz.position.y = 1.0;
+      this.propRects.push({ x0:cx-1.4, x1:cx+1.4, z0:F.z0-0.2, z1:cz+0.5 });
+      // 기둥(뒤쪽 양 끝), 화분(입구 양쪽), 쓰레기통
+      put('arcade-column', F.x0 + 0.35, F.z0 + 0.35, 3.0); put('arcade-column', F.x1 - 0.35, F.z0 + 0.35, 3.0);
+      put('furn-plantSmall1', -1.6, F.z1 - 0.4, 0.9); put('furn-plantSmall2', 1.6, F.z1 - 0.4, 0.9);
+      put('furn-lampRoundFloor', F.x1 - 0.5, F.z1 - 0.6, 1.6);
+    } else {
+      put('furn-plantSmall2', F.x0 + 0.5, F.z0 + 0.5, 0.9);
+    }
   }
   resize(w, h){
     const a = w/h; this.aspect = a; this.camera.aspect = a;
@@ -184,8 +211,8 @@ export class StoreScene {
     if (f.pattern === 'checker'){ for (let x=-Math.floor(W/2); x<=Math.floor(W/2); x++) for (let z=0; z<D; z++) if ((x+z)%2===0){ const t = box(0.98, 0.012, 0.98, f.tile, x, 0.006, -4 + 0.5 + z); t.receiveShadow = true; this.tileGroup.add(t); } }
     if (f.pattern === 'plank'){ for (let z=0; z<D; z++) for (let i=0;i<Math.ceil(W/3.5);i++){ const t = box(3.4, 0.012, 0.42, i%2 ? f.tile : f.base, -W/2 + 1.75 + i*3.5 + (z%2)*0.6, 0.006, -4 + 0.75 + z); t.receiveShadow = true; this.tileGroup.add(t); } }
     this.walls.forEach(m => m.material.color.setHex(w.color));
-    this.hemi.color.setHex(l.hemi); this.hemi.groundColor.setHex(l.ground); this.hemi.intensity = l.hemiI;
-    this.sun.color.setHex(l.sun); this.sun.intensity = l.sunI;
+    this.hemi.color.setHex(l.hemi); this.hemi.groundColor.setHex(l.ground); this.hemi.intensity = l.hemiI*1.25;
+    this.sun.color.setHex(l.sun); this.sun.intensity = l.sunI*1.3;
     this.scene.background = new THREE.Color(l.bg); this.scene.fog = new THREE.Fog(l.bg, 14, 30);
     this.neonLights.forEach(n => this.scene.remove(n)); this.neonLights = [];
     l.neon.forEach((c, i) => { const p = new THREE.PointLight(c, 2.5, 7); p.position.set(-W/2+1.5 + i*((W-3)/Math.max(1, l.neon.length-1)), 2.6, -3.2); this.scene.add(p); this.neonLights.push(p);
@@ -260,6 +287,7 @@ export class StoreScene {
     const door = { x0:F.door.x0, x1:F.door.x1, z0:F.door.z0, z1:F.z1+1 };
     if (overlaps(rect, door)) return false;
     if (F.stairs && overlaps(rect, F.stairs, 0.1)) return false;
+    if (this.propRects.some(r => overlaps(rect, r, 0.1))) return false;
     for (let i=0;i<this.save.slots.length;i++){ const d = this.save.slots[i]; if (!d || i === ignore || (d.floor||0) !== this.floor) continue; if (overlaps(rect, slotRect(d), 0.15)) return false; }
     return true;
   }
@@ -301,6 +329,7 @@ export class StoreScene {
     const blocked = new Uint8Array(nx*nz);
     const rects = this.save.slots.filter(d => d && (d.floor||0) === this.floor).map(d => slotRect(d));
     if (F.stairs) rects.push(F.stairs);
+    rects.push(...this.propRects);
     for (let ix=0; ix<nx; ix++) for (let iz=0; iz<nz; iz++){
       const cx = F.x0 + (ix+0.5)*GRID, cz = F.z0 + (iz+0.5)*GRID;
       if (rects.some(r => cx > r.x0-0.2 && cx < r.x1+0.2 && cz > r.z0-0.2 && cz < r.z1+0.2)) blocked[ix + iz*nx] = 1;
@@ -349,7 +378,8 @@ export class StoreScene {
     const dir = dst.clone().sub(mv.g.position); dir.y = 0; const dist = dir.length();
     if (dist < 0.06){ mv.path.shift(); if (!mv.path.length) return true; return false; }
     dir.normalize(); mv.g.position.add(dir.multiplyScalar(Math.min(dist, speed*dt)));
-    mv.g.rotation.y = Math.atan2(dir.x, dir.z) + Math.PI;
+    mv.g.rotation.y = Math.atan2(dir.x, dir.z);
+    this.setAnim(mv.g, speed > 1.5 ? 'sprint' : 'walk', { speed: speed > 1.5 ? 1 : Math.max(0.8, speed/1.1) });
     return false;
   }
 
@@ -362,7 +392,7 @@ export class StoreScene {
     const F = this.F; let i = 0;
     STAFF.forEach(st => {
       if (!this.hasStaff(st.id)) return;
-      const g = this.makePerson(); g.position.set(F.x0 + 0.8 + i*0.8, 0, F.z0 + 0.6); g.rotation.y = Math.PI;
+      const g = this.makePerson('arcade-character-employee'); g.position.set(F.x0 + 0.9 + i*0.7, 0, F.z0 + 0.6); g.rotation.y = 0; this.setAnim(g, 'idle');
       const tag = makeTextSprite(`${st.icon} ${st.name}`, { size:56, color:'#241c2e', bg:'rgba(255,255,255,0.92)', width:512, height:128 }); tag.scale.set(0.9, 0.22, 1); tag.position.y = 1.15; g.add(tag);
       this.staffFigs.push(g); i++;
     });
@@ -454,8 +484,16 @@ export class StoreScene {
     if (call && this.hooks.onCall) this.hooks.onCall(i, data.price);
     return { win, key, price:gain, complaint, broken:!!data.broken, justBroke };
   }
-  makePerson(){
+  setAnim(g, name, opts){ if (g.userData.model) playAnim(g.userData.model, name, opts); }
+  makePerson(force){
     const g = new THREE.Group();
+    const name = force || CHARACTERS[Math.floor(Math.random()*CHARACTERS.length)];
+    const model = spawn(name);
+    if (model){
+      fitHeight(model, rand(0.92, 1.06)); g.add(model); g.userData.model = model; playAnim(model, 'idle');
+      g.position.copy(this.DOOR).add(new THREE.Vector3(rand(-0.5,0.5), 0, rand(0, 0.3)));
+      this.scene.add(g); return g;
+    }
     const c = PASTELS[Math.floor(Math.random()*PASTELS.length)];
     g.scale.setScalar(rand(0.85, 1.1));
     g.add(cyl(0.13, 0.16, 0.42, c, 0, 0.36, 0, 8));
@@ -533,8 +571,10 @@ export class StoreScene {
     for (let k=this.wanderers.length-1; k>=0; k--){
       const w = this.wanderers[k]; w.t += dt; w.sayT -= dt;
       if (w.sayT <= 0 && !w.leaving && w.g.visible){ w.sayT = rand(12, 30); if (Math.random() < 0.5) this.say(w.g, 'wander'); }
+      tickAnim(w.g.userData.model, dt);
       if (w.wait > 0){
-        w.wait -= dt; w.g.position.y = w.sitting ? -0.02 : Math.abs(Math.sin(w.t*2))*0.01;
+        w.wait -= dt; w.g.position.y = w.sitting ? -0.02 : (w.g.userData.model ? 0 : Math.abs(Math.sin(w.t*2))*0.01);
+        this.setAnim(w.g, w.sitting ? 'sit' : 'idle');
         if (w.wait <= 0 && w.visit){
           if (w.visit.kind === 'toilet'){ w.g.visible = true; const s = this.slots[w.visit.i]; if (s?.cab?.door) s.cab.door.rotation.y = 0; this.save.toiletDirt = (this.save.toiletDirt||0) + 1; const dirty = this.save.toiletDirt > 15; this.save.rep = clamp((this.save.rep??3) + (dirty ? -0.01 : 0.012), 1, 5); if (Math.random() < 0.25) this.addReview('toilet', null, dirty ? 2 : 5); if (dirty && this.save.reviews) { /* 더러운 화장실 리뷰는 index 2 */ } this.say(w.g, 'toilet'); }
           if (w.visit.kind === 'bench'){ w.sitting = false; w.g.position.y = 0; }
@@ -547,17 +587,19 @@ export class StoreScene {
         if (w.visit && w.visit.kind === 'toilet'){ const s = this.slots[w.visit.i]; if (s?.cab?.door) s.cab.door.rotation.y = -1.6; w.g.visible = false; w.wait = rand(3, 5); continue; }
         if (w.visit && w.visit.kind === 'bench'){ w.sitting = true; const d = this.save.slots[w.visit.i]; w.g.rotation.y = (d.rot||0)*Math.PI/2; w.wait = rand(4, 9); continue; }
         w.wait = rand(1.5, 5); w.target = this.wanderTarget(w); w.path = null;
-      } else w.g.position.y = Math.abs(Math.sin(w.t*9))*0.035;
+      } else if (!w.g.userData.model) w.g.position.y = Math.abs(Math.sin(w.t*9))*0.035;
     }
+    this.staffFigs.forEach(f => tickAnim(f.userData.model, dt));
   }
   update(dt){
     for (let k=this.customers.length-1; k>=0; k--){
       const cu = this.customers[k]; cu.t += dt;
-      const bob = Math.abs(Math.sin(cu.t*10))*0.04;
+      const bob = cu.g.userData.model ? 0 : Math.abs(Math.sin(cu.t*10))*0.04;
+      tickAnim(cu.g.userData.model, dt);
       if (cu.phase === 'in' || cu.phase === 'out'){
         if (cu.phase === 'out' && !cu.target.equals(this.DOOR)){ cu.target = this.DOOR.clone(); cu.path = null; }
         if (this.walk(cu, dt, cu.speed||1.7)){
-          if (cu.phase === 'in'){ cu.phase = 'play'; cu.wait = 2.2 + Math.random(); const d = this.save.slots[cu.i]; if (d) cu.g.rotation.y = (d.rot||0)*Math.PI/2 + Math.PI; }
+          if (cu.phase === 'in'){ cu.phase = 'play'; cu.wait = 2.2 + Math.random(); const d = this.save.slots[cu.i]; if (d) cu.g.rotation.y = (d.rot||0)*Math.PI/2 + Math.PI; this.setAnim(cu.g, 'interact-right'); }
           else { this.scene.remove(cu.g); this.customers.splice(k,1); continue; }
         } else cu.g.position.y = bob;
       } else if (cu.phase === 'play'){
@@ -569,11 +611,16 @@ export class StoreScene {
           const pos = cu.g.position.clone().add(new THREE.Vector3(0, 1.3, 0));
           if (res){
             this.hooks.floatText(pos, '+' + won(res.price), 'money'); sfx.cash();
-            if (res.win){ this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '🎉 ' + PLUSH_TYPES[res.key].name + ' 당첨!', 'win'); this.say(cu.g, 'win', res.key); }
-            else if (res.complaint || res.broken){ this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), res.broken ? '😡 고장 났잖아!!' : '😡 너무해!! 집게 뭐야', 'bad'); this.say(cu.g, 'angry'); }
-            else if (Math.random() < 0.45){ const d = this.save.slots[cu.i]; const ks = d ? Object.keys(d.stock).filter(kk => d.stock[kk] > 0) : []; this.say(cu.g, 'lose', ks.length ? ks[Math.floor(Math.random()*ks.length)] : null); }
+            if (res.win){ this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '🎉 ' + PLUSH_TYPES[res.key].name + ' 당첨!', 'win'); this.say(cu.g, 'win', res.key); this.setAnim(cu.g, 'emote-yes', { loop:false }); cu.react = 1.2; }
+            else if (res.complaint || res.broken){ this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), res.broken ? '😡 고장 났잖아!!' : '😡 너무해!! 집게 뭐야', 'bad'); this.say(cu.g, 'angry'); this.setAnim(cu.g, 'attack-kick-right', { loop:false }); cu.react = 1.0; }
+            else if (Math.random() < 0.45){ this.setAnim(cu.g, 'emote-no', { loop:false }); cu.react = 1.0; const d = this.save.slots[cu.i]; const ks = d ? Object.keys(d.stock).filter(kk => d.stock[kk] > 0) : []; this.say(cu.g, 'lose', ks.length ? ks[Math.floor(Math.random()*ks.length)] : null); }
           }
           if (s && s.cab && s.cab.claw){ const m = machineDef(this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
+          cu.phase = 'react'; cu.wait = cu.react || 0.3;
+        }
+      } else if (cu.phase === 'react'){
+        cu.wait -= dt;
+        if (cu.wait <= 0){
           if (Math.random() < 0.4){ const w = { g:cu.g, target:null, wait:0, t:cu.t, speed:rand(0.8,1.3), leaving:false, path:null, sayT:rand(8,20) }; w.target = this.wanderTarget(w); this.wanderers.push(w); this.customers.splice(k,1); continue; }
           cu.phase = 'out'; cu.target = this.DOOR.clone(); cu.path = null;
         }

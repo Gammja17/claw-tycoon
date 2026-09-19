@@ -4,6 +4,7 @@ import { createMachine, BASE_H } from './machine.js';
 import { StoreScene, slotEconomy, machineDef, bdDef } from './store.js';
 import { box, lerp } from './util.js';
 import { sfx } from './audio.js';
+import { preload, CHARACTERS, PROPS } from './assets.js';
 
 // ---------- 저장 ----------
 function loadSave(){
@@ -39,6 +40,7 @@ const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
 app.appendChild(renderer.domElement);
 renderer.domElement.tabIndex = 0; renderer.domElement.style.outline = 'none';
 
@@ -72,6 +74,8 @@ function toast(t){ const e = $('toast'); e.textContent = t; e.classList.add('sho
 const store = new StoreScene(save, { onChange: refreshStoreHUD, floatText, say, toast, onReview: () => { if (!$('m-reviews').classList.contains('hidden')) renderReviews(); }, onCall: (i, price) => queueCall(i, price) });
 let mode = 'store';
 let play = null;
+// Kenney 모델 프리로드 → 소품·직원 다시 그리기
+preload([...CHARACTERS, ...PROPS]).then(() => { store.buildProps(); store.buildNav(); store.rebuildStaff(); store.rebuildAll(); });
 
 function resize(){
   renderer.setSize(innerWidth, innerHeight);
@@ -464,8 +468,8 @@ function showMsg(t){ const e = $('pu-msg'); if (!t){ e.classList.remove('show');
 function enterPlay(shop, opts={}){
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xdcefff);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xffd0e0, 0.9));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.5); sun.position.set(2.5, 5, 3); sun.castShadow = true;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0xffd0e0, 1.15));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.9); sun.position.set(2.5, 5, 3); sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left:-3, right:3, top:4, bottom:-2, near:0.5, far:15 }); scene.add(sun);
   const fill = new THREE.PointLight(0xfff0f5, 0.6, 6); fill.position.set(0, BASE_H + shop.h, 1.5); scene.add(fill);
   const ground = box(14, 0.1, 14, 0xf7d9b5, 0, -0.05, 0); ground.receiveShadow = true; scene.add(ground);

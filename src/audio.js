@@ -1,30 +1,32 @@
+// 효과음: Kenney CC0 오디오 팩 (assets/sfx). 모터 소리만 합성
+const FILES = { click:'click', coin:'coin', start:'start', close:'close', drop:'drop', thud:'thud', thud2:'thud2', win:'win', fail:'fail', cash:'cash', buy:'buy', bell:'bell', ring:'ring', broken:'broken', switch:'switch', plate:'plate', step:'step' };
+const pool = {};
+function play(name, vol=0.5, rate=1){
+  try {
+    let a = pool[name]; if (!a){ a = new Audio(`assets/sfx/${FILES[name] || name}.ogg`); a.preload = 'auto'; pool[name] = a; }
+    const c = a.cloneNode(); c.volume = Math.min(1, vol); c.playbackRate = rate; c.play().catch(()=>{});
+  } catch(e) {}
+}
 let ctx = null, motorOsc = null, motorGain = null;
 function ac(){
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
   if (ctx.state === 'suspended') ctx.resume();
   return ctx;
 }
-function beep(freq=440, dur=0.1, type='square', vol=0.08, delay=0){
-  try {
-    const c = ac(), o = c.createOscillator(), g = c.createGain();
-    o.type = type; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol, c.currentTime + delay);
-    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + delay + dur);
-    o.connect(g); g.connect(c.destination);
-    o.start(c.currentTime + delay); o.stop(c.currentTime + delay + dur + 0.02);
-  } catch(e) {}
-}
 export const sfx = {
-  click(){ beep(700, 0.05, 'square', 0.05); },
-  coin(){ beep(1200, 0.06, 'sine', 0.1); beep(1800, 0.12, 'sine', 0.1, 0.07); },
-  start(){ [660,880].forEach((f,i)=>beep(f,0.1,'square',0.06,i*0.1)); },
-  close(){ beep(240, 0.18, 'sawtooth', 0.04); },
-  drop(){ beep(330, 0.12, 'triangle', 0.08); beep(200, 0.3, 'triangle', 0.08, 0.1); },
-  thud(){ beep(90, 0.12, 'sine', 0.12); },
-  win(){ [523,659,784,1047,1319].forEach((f,i)=>beep(f,0.2,'square',0.07,i*0.11)); },
-  fail(){ beep(220, 0.2, 'sawtooth', 0.04); beep(150, 0.4, 'sawtooth', 0.04, 0.2); },
-  cash(){ beep(1500, 0.05, 'sine', 0.08); beep(2000, 0.1, 'sine', 0.08, 0.05); },
-  buy(){ [440,554,659].forEach((f,i)=>beep(f,0.12,'triangle',0.07,i*0.08)); },
+  click(){ play('click', 0.4); },
+  coin(){ play('coin', 0.6); },
+  start(){ play('start', 0.5); },
+  close(){ play('close', 0.45, 0.9); },
+  drop(){ play('drop', 0.55); setTimeout(() => play('thud', 0.5), 120); },
+  thud(){ play('thud2', 0.5); },
+  win(){ play('win', 0.7); setTimeout(() => play('bell', 0.4, 1.2), 150); },
+  fail(){ play('fail', 0.4); },
+  cash(){ play('cash', 0.35, 1.3); },
+  buy(){ play('buy', 0.55); },
+  ring(){ play('ring', 0.6); },
+  broken(){ play('broken', 0.5); },
+  switch(){ play('switch', 0.4); },
   motor(on){
     try {
       const c = ac();
