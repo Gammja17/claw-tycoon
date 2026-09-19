@@ -4,72 +4,120 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>인형뽑기 타이쿤</title>
-<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-  :root { --pink:#ff4f8b; --pink2:#ff8fab; --ink:#3b2a3a; --bg:#fff7fa; }
+  :root {
+    --accent:#ff4f8b; --accent-2:#7c5cff; --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444;
+    --ink:#241c2e; --muted:#7d7386; --line:rgba(36,28,46,.08);
+    --card:rgba(255,255,255,.82); --card-solid:#ffffff; --glass:rgba(255,255,255,.66);
+    --shadow:0 10px 30px rgba(36,28,46,.14), 0 1px 2px rgba(36,28,46,.06);
+    --r:18px; --r-sm:12px;
+  }
   * { box-sizing:border-box; }
-  html, body { margin:0; height:100%; overflow:hidden; background:#ffe9f0; font-family:'Jua', system-ui, sans-serif; color:var(--ink); }
+  html, body { margin:0; height:100%; overflow:hidden; background:#ffe9f0; font-family:'Noto Sans KR', system-ui, -apple-system, sans-serif; color:var(--ink); font-size:14px; }
   canvas { display:block; }
   #app { position:fixed; inset:0; }
   .hidden { display:none !important; }
-  button { font-family:inherit; font-size:16px; border:0; border-radius:14px; padding:10px 16px; background:var(--pink); color:#fff; cursor:pointer; box-shadow:0 4px 0 #d13a70; transition:transform .05s; }
-  button:active { transform:translateY(3px); box-shadow:0 1px 0 #d13a70; }
-  button.ghost { background:#fff; color:var(--pink); box-shadow:0 4px 0 #e6c4d0; }
-  button.ghost:active { box-shadow:0 1px 0 #e6c4d0; }
-  button:disabled { opacity:.45; cursor:default; }
-  button.sm { font-size:13px; padding:5px 10px; border-radius:10px; box-shadow:0 3px 0 #d13a70; }
-  .topbar { position:fixed; top:10px; left:10px; right:10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; pointer-events:none; }
-  .topbar > * { pointer-events:auto; }
-  .chip { background:rgba(255,255,255,.92); border-radius:14px; padding:8px 14px; font-size:18px; box-shadow:0 3px 10px rgba(0,0,0,.12); }
-  .chip.money { color:#1f9d55; font-size:20px; }
-  .spacer { flex:1; }
-  .modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(560px, 94vw); max-height:88vh; overflow:auto; background:var(--bg); border-radius:22px; padding:18px 20px; box-shadow:0 20px 60px rgba(0,0,0,.25); z-index:20; }
-  .modal h2 { margin:0 0 8px; color:var(--pink); font-size:24px; }
-  .modal h3 { margin:14px 0 6px; font-size:17px; }
-  .modal .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
-  .modal .close { position:absolute; right:14px; top:12px; background:#eee; color:#666; box-shadow:0 3px 0 #ccc; padding:6px 12px; }
-  .backdrop { position:fixed; inset:0; background:rgba(60,20,40,.35); z-index:15; }
-  .list { display:flex; flex-direction:column; gap:6px; }
-  .item { display:flex; align-items:center; gap:10px; background:#fff; border-radius:14px; padding:8px 12px; box-shadow:0 2px 6px rgba(0,0,0,.06); }
-  .item .dot { width:22px; height:22px; border-radius:50%; flex:none; border:2px solid rgba(0,0,0,.1); }
-  .item .name { flex:1; font-size:16px; }
-  .item .sub { font-size:12px; color:#8a7a86; }
-  .tag { font-size:11px; padding:2px 7px; border-radius:8px; color:#fff; }
-  input[type=number] { font-family:inherit; font-size:18px; width:120px; padding:6px 10px; border-radius:10px; border:2px solid #f3c6d6; }
-  select { font-family:inherit; font-size:15px; padding:6px 10px; border-radius:10px; border:2px solid #f3c6d6; background:#fff; }
-  .hint { font-size:13px; color:#8a7a86; }
-  .stat { display:inline-block; background:#fff; border-radius:10px; padding:6px 10px; margin:2px; font-size:14px; }
-  /* 플레이 HUD */
-  #play-ui .bottombar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
-  #pu-timer { position:fixed; top:64px; left:50%; transform:translateX(-50%); width:min(420px, 80vw); height:14px; background:rgba(255,255,255,.7); border-radius:8px; overflow:hidden; }
-  #pu-timer-fill { height:100%; width:100%; background:linear-gradient(90deg,#ffd166,#ff4f8b); transition:width .1s linear; }
-  #pu-msg { position:fixed; top:38%; left:50%; transform:translate(-50%,-50%); font-size:40px; color:#fff; text-shadow:0 3px 0 #d13a70, 0 6px 18px rgba(0,0,0,.3); pointer-events:none; opacity:0; transition:opacity .2s; text-align:center; }
+  h1,h2,h3,.display { font-family:'Jua', 'Noto Sans KR', sans-serif; font-weight:400; letter-spacing:.2px; }
+
+  /* ---------- 버튼 ---------- */
+  button { font-family:inherit; font-size:14px; font-weight:600; border:0; border-radius:var(--r-sm); padding:10px 16px; background:var(--accent); color:#fff; cursor:pointer; transition:transform .08s, box-shadow .08s, background .15s; box-shadow:0 6px 16px rgba(255,79,139,.28); display:inline-flex; align-items:center; gap:6px; justify-content:center; }
+  button:hover { transform:translateY(-1px); }
+  button:active { transform:translateY(1px) scale(.98); box-shadow:0 2px 6px rgba(255,79,139,.25); }
+  button.ghost { background:var(--card-solid); color:var(--ink); box-shadow:0 1px 2px rgba(36,28,46,.08), inset 0 0 0 1px var(--line); }
+  button.ghost:hover { background:#fff5f9; }
+  button.danger { background:#fff1f1; color:var(--bad); box-shadow:inset 0 0 0 1px rgba(239,68,68,.25); }
+  button.ok { background:var(--ok); box-shadow:0 6px 16px rgba(22,163,74,.25); }
+  button:disabled { opacity:.4; cursor:default; transform:none; box-shadow:none; }
+  button.sm { font-size:12px; padding:6px 10px; border-radius:10px; }
+  button.icon { flex-direction:column; gap:2px; width:64px; height:60px; padding:6px 4px; font-size:11px; font-weight:600; background:var(--glass); color:var(--ink); box-shadow:0 1px 2px rgba(36,28,46,.08), inset 0 0 0 1px var(--line); backdrop-filter:blur(10px); }
+  button.icon .em { font-size:22px; line-height:1; }
+  button.icon.primary { background:var(--accent); color:#fff; box-shadow:0 8px 20px rgba(255,79,139,.3); }
+
+  /* ---------- 상단 HUD ---------- */
+  .hud { position:fixed; top:12px; left:12px; right:12px; display:flex; gap:10px; align-items:flex-start; pointer-events:none; z-index:6; }
+  .hud > * { pointer-events:auto; }
+  .status { display:flex; align-items:center; gap:0; background:var(--glass); backdrop-filter:blur(12px); border-radius:16px; box-shadow:var(--shadow); padding:6px 8px; }
+  .status .cell { padding:4px 14px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:1px; min-width:90px; }
+  .status .cell:last-child { border-right:0; }
+  .status .lbl { font-size:10px; color:var(--muted); letter-spacing:.3px; }
+  .status .val { font-family:'Jua', sans-serif; font-size:20px; line-height:1.1; white-space:nowrap; }
+  .status .val.money { color:var(--ok); }
+  .status .val.small { font-size:14px; font-family:inherit; font-weight:600; }
+  .dock { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
+  .chip { background:var(--glass); backdrop-filter:blur(10px); border-radius:12px; padding:8px 12px; font-size:13px; font-weight:600; box-shadow:0 1px 2px rgba(36,28,46,.08), inset 0 0 0 1px var(--line); }
+  .chip.promo { color:#c2185b; background:#fff0f5; }
+  .chip.alert { color:var(--bad); background:#fff1f1; }
+
+  /* ---------- 모달 ---------- */
+  .backdrop { position:fixed; inset:0; background:rgba(36,28,46,.42); backdrop-filter:blur(3px); z-index:15; }
+  .modal { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(600px, 94vw); max-height:88vh; display:flex; flex-direction:column; background:#fbf7f9; border-radius:22px; box-shadow:0 30px 80px rgba(36,28,46,.35); z-index:20; overflow:hidden; }
+  .modal h2 { margin:0; font-size:22px; padding:18px 22px 12px; color:var(--ink); display:flex; align-items:center; gap:8px; }
+  .modal h3 { margin:16px 0 8px; font-size:15px; color:var(--ink); }
+  .modal .close { position:absolute; right:14px; top:14px; width:34px; height:34px; padding:0; border-radius:50%; background:#fff; color:var(--muted); box-shadow:inset 0 0 0 1px var(--line); font-size:16px; }
+  .modal .body { padding:0 22px 20px; overflow:auto; }
+  .modal .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+  .hint { font-size:12.5px; color:var(--muted); line-height:1.55; }
+  .list { display:flex; flex-direction:column; gap:8px; }
+  .item, .shop-card, .decor-card { display:flex; align-items:center; gap:12px; background:var(--card-solid); border-radius:14px; padding:10px 14px; box-shadow:0 1px 2px rgba(36,28,46,.06), inset 0 0 0 1px var(--line); }
+  .item .dot { width:34px; height:34px; border-radius:10px; flex:none; box-shadow:inset 0 0 0 2px rgba(255,255,255,.6), 0 1px 3px rgba(0,0,0,.12); display:flex; align-items:center; justify-content:center; }
+  .item .name, .shop-card .body, .decor-card .name { flex:1; min-width:0; font-weight:600; }
+  .item .sub, .shop-card .desc { font-size:12px; color:var(--muted); font-weight:400; margin-top:2px; }
+  .shop-card .title { font-size:15px; font-weight:700; }
+  .shop-card .swatch { width:46px; height:46px; border-radius:12px; flex:none; box-shadow:inset 0 0 0 2px rgba(255,255,255,.6); display:flex; align-items:center; justify-content:center; font-size:22px; }
+  .tag { font-size:10.5px; padding:2px 7px; border-radius:7px; color:#fff; font-weight:700; vertical-align:middle; }
+  .stat { display:inline-flex; flex-direction:column; background:#fff; border-radius:12px; padding:8px 12px; margin:3px 4px 3px 0; box-shadow:inset 0 0 0 1px var(--line); min-width:88px; }
+  .stat b { font-family:'Jua', sans-serif; font-weight:400; font-size:17px; }
+  .stat span { font-size:10.5px; color:var(--muted); }
+  .decor-card .sw { width:38px; height:38px; border-radius:10px; flex:none; box-shadow:inset 0 0 0 2px rgba(255,255,255,.6), 0 1px 3px rgba(0,0,0,.12); }
+  .decor-card.on { outline:2px solid var(--accent); }
+  input[type=number], select { font-family:inherit; font-size:14px; padding:8px 12px; border-radius:10px; border:1px solid rgba(36,28,46,.15); background:#fff; color:var(--ink); }
+  input[type=number] { width:120px; }
+  .tabs { display:flex; gap:4px; background:#efe9ee; border-radius:12px; padding:4px; margin:0 22px 10px; }
+  .tabs button { flex:1; background:transparent; color:var(--muted); box-shadow:none; padding:8px; border-radius:9px; font-weight:600; }
+  .tabs button.on { background:#fff; color:var(--ink); box-shadow:0 1px 3px rgba(36,28,46,.12); }
+  .tab { display:none; } .tab.on { display:block; }
+  .banner { border-radius:12px; padding:10px 12px; font-size:13px; font-weight:600; }
+  .banner.bad { background:#fff1f1; color:var(--bad); }
+  .banner.ok { background:#ecfdf3; color:var(--ok); }
+  .banner.info { background:#f1efff; color:#5b43d6; }
+
+  /* ---------- 건축 툴바 ---------- */
+  #build-bar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:6px; align-items:center; background:var(--glass); backdrop-filter:blur(12px); border-radius:18px; padding:8px; box-shadow:var(--shadow); z-index:5; }
+  #build-bar .lbl { font-size:12px; color:var(--muted); padding:0 10px; max-width:220px; }
+
+  /* ---------- 플레이 HUD ---------- */
+  #pu-desc { position:fixed; top:84px; left:12px; max-width:min(420px, 60vw); background:var(--glass); backdrop-filter:blur(10px); border-radius:12px; padding:8px 12px; font-size:12px; color:var(--ink); line-height:1.5; box-shadow:0 1px 2px rgba(36,28,46,.08), inset 0 0 0 1px var(--line); }
+  #pu-timer { position:fixed; top:14px; left:50%; transform:translateX(-50%); width:min(360px, 50vw); height:8px; background:rgba(255,255,255,.55); border-radius:6px; overflow:hidden; z-index:7; }
+  #pu-timer-fill { height:100%; width:100%; background:linear-gradient(90deg,#ffd166,var(--accent)); transition:width .1s linear; }
+  #pu-msg { position:fixed; top:36%; left:50%; transform:translate(-50%,-50%); font-family:'Jua', sans-serif; font-size:42px; color:#fff; text-shadow:0 3px 0 #d13a70, 0 8px 24px rgba(0,0,0,.3); pointer-events:none; opacity:0; transition:opacity .2s; text-align:center; }
   #pu-msg.show { opacity:1; }
-  #pu-desc { position:fixed; top:90px; left:50%; transform:translateX(-50%); background:rgba(255,255,255,.8); border-radius:12px; padding:6px 12px; font-size:13px; max-width:90vw; text-align:center; }
-  #dpad { position:fixed; left:18px; bottom:18px; display:grid; grid-template-columns:repeat(3, 56px); grid-template-rows:repeat(3, 56px); gap:4px; }
-  #dpad button { font-size:22px; padding:0; border-radius:12px; background:rgba(255,255,255,.9); color:var(--pink); box-shadow:0 3px 0 #e6c4d0; touch-action:none; user-select:none; }
-  #pu-drop { position:fixed; right:18px; bottom:18px; width:120px; height:120px; border-radius:50%; font-size:22px; background:#ffd400; color:#5a3a00; box-shadow:0 6px 0 #c9a600; }
-  #pu-drop:active { box-shadow:0 2px 0 #c9a600; }
-  #build-bar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; z-index:5; }
-  #pu-hint { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(59,42,58,.85); color:#fff; padding:6px 12px; border-radius:10px; font-size:13px; max-width:80vw; text-align:center; pointer-events:none; }
+  #pu-hint { position:fixed; bottom:104px; left:50%; transform:translateX(-50%); background:rgba(36,28,46,.86); color:#fff; padding:7px 14px; border-radius:12px; font-size:12.5px; max-width:80vw; text-align:center; pointer-events:none; backdrop-filter:blur(8px); }
   #pu-hint:empty { display:none; }
-  .decor-card { display:flex; align-items:center; gap:10px; background:#fff; border-radius:12px; padding:8px 12px; }
-  .decor-card .sw { width:36px; height:36px; border-radius:8px; border:2px solid rgba(0,0,0,.1); flex:none; }
-  .decor-card .name { flex:1; }
-  .decor-card.on { outline:3px solid var(--pink); }
-  #keys { position:fixed; bottom:206px; left:18px; font-size:12px; color:#7a5a6a; background:rgba(255,255,255,.7); border-radius:10px; padding:6px 10px; }
-  .float { position:fixed; transform:translate(-50%,-50%); font-size:20px; color:#1f9d55; text-shadow:0 2px 0 #fff, 0 0 8px #fff; pointer-events:none; animation:floatUp 1.6s ease-out forwards; white-space:nowrap; }
-  .float.win { color:var(--pink); font-size:22px; }
-  .float.bad { color:#d13a3a; font-size:18px; }
+  .bottombar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:8px; align-items:center; background:var(--glass); backdrop-filter:blur(12px); border-radius:18px; padding:8px; box-shadow:var(--shadow); }
+  #dpad { position:fixed; left:18px; bottom:18px; display:grid; grid-template-columns:repeat(3, 54px); grid-template-rows:repeat(3, 54px); gap:4px; }
+  #dpad button { font-size:20px; padding:0; border-radius:14px; background:var(--glass); color:var(--ink); box-shadow:inset 0 0 0 1px var(--line); touch-action:none; user-select:none; backdrop-filter:blur(8px); }
+  #pu-drop { position:fixed; right:18px; bottom:18px; width:112px; height:112px; border-radius:50%; font-family:'Jua', sans-serif; font-size:20px; font-weight:400; background:#ffd400; color:#4a3300; box-shadow:0 8px 0 #c9a600, 0 14px 30px rgba(0,0,0,.2); }
+  #pu-drop:active { transform:translateY(5px); box-shadow:0 3px 0 #c9a600; }
+  #keys { position:fixed; bottom:200px; left:18px; font-size:11.5px; color:var(--muted); background:var(--glass); border-radius:10px; padding:6px 10px; backdrop-filter:blur(8px); }
+  #pip-frame { position:fixed; pointer-events:none; border-radius:12px; box-shadow:0 0 0 2px rgba(255,255,255,.85), 0 10px 30px rgba(0,0,0,.25); }
+  #pip-frame .cap { position:absolute; left:8px; top:6px; font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.6); }
+
+  /* ---------- 떠다니는 텍스트/말풍선 ---------- */
+  .float { position:fixed; transform:translate(-50%,-50%); font-family:'Jua', sans-serif; font-size:20px; color:var(--ok); text-shadow:0 2px 0 #fff, 0 0 10px #fff; pointer-events:none; animation:floatUp 1.6s ease-out forwards; white-space:nowrap; z-index:4; }
+  .float.win { color:var(--accent); font-size:22px; }
+  .float.bad { color:var(--bad); font-size:18px; }
   @keyframes floatUp { 0%{opacity:0; margin-top:10px} 15%{opacity:1} 100%{opacity:0; margin-top:-60px} }
-  #toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(59,42,58,.92); color:#fff; padding:10px 18px; border-radius:14px; font-size:16px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; }
+  .bubble { position:fixed; transform:translate(-50%,-100%); background:#fff; color:var(--ink); padding:6px 10px; border-radius:12px; font-size:12.5px; font-weight:700; white-space:nowrap; pointer-events:none; box-shadow:0 4px 14px rgba(36,28,46,.18); z-index:4; animation:pop .18s ease-out; }
+  .bubble:after { content:''; position:absolute; left:50%; bottom:-6px; width:10px; height:10px; background:#fff; transform:translateX(-50%) rotate(45deg); }
+  .bubble.angry { background:#ffe4e4; color:var(--bad); } .bubble.angry:after { background:#ffe4e4; }
+  .bubble.win { background:#ffe6f0; color:#c2185b; } .bubble.win:after { background:#ffe6f0; }
+  @keyframes pop { from { transform:translate(-50%,-100%) scale(.6); opacity:0 } to { transform:translate(-50%,-100%) scale(1); opacity:1 } }
+  #toast { position:fixed; bottom:92px; left:50%; transform:translateX(-50%); background:rgba(36,28,46,.92); color:#fff; padding:10px 18px; border-radius:14px; font-size:14px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:30; backdrop-filter:blur(8px); }
   #toast.show { opacity:1; }
-  .shop-card { background:#fff; border-radius:16px; padding:12px 14px; box-shadow:0 2px 8px rgba(0,0,0,.08); display:flex; gap:10px; align-items:center; }
-  .shop-card .swatch { width:46px; height:46px; border-radius:12px; flex:none; }
-  .shop-card .body { flex:1; }
-  .shop-card .title { font-size:18px; }
-  .shop-card .desc { font-size:12px; color:#8a7a86; }
-  @media (max-width:640px){ .chip { font-size:14px; padding:6px 10px; } .chip.money { font-size:16px; } }
+  .ring { animation:ring .5s ease-in-out infinite alternate; }
+  @keyframes ring { from { transform:rotate(-8deg) } to { transform:rotate(8deg) } }
+  @media (max-width:720px){ .status .cell { min-width:64px; padding:4px 8px; } .status .val { font-size:16px; } button.icon { width:52px; height:52px; font-size:10px; } button.icon .em { font-size:18px; } }
 </style>
 </head>
 <body>
@@ -77,60 +125,61 @@
 
 <!-- 가게 화면 UI -->
 <div id="store-ui">
-  <div class="topbar">
-    <div class="chip money" id="su-money">0원</div>
-    <div class="chip" id="su-info">기계 0대</div>
-    <div class="chip" id="su-rep">⭐ 3.0</div>
-    <div class="chip hidden" id="su-promo-chip" style="color:#d13a70"></div>
-    <div class="spacer"></div>
-    <button id="su-trip">🚌 원정 가기</button>
-    <button class="ghost" id="su-whole">🚚 도매</button>
-    <button class="ghost" id="su-promo">📣 홍보</button>
-    <button class="ghost" id="su-reviews">💬 리뷰</button>
-    <button class="ghost" id="su-build">🔨 건축</button>
-    <button class="ghost" id="su-inv">📦 창고</button>
-    <button class="ghost" id="su-help">❓</button>
+  <div class="hud">
+    <div class="status">
+      <div class="cell"><span class="lbl">보유 현금</span><span class="val money" id="su-money">0원</span></div>
+      <div class="cell"><span class="lbl">평점</span><span class="val" id="su-rep">⭐ 3.0</span></div>
+      <div class="cell"><span class="lbl">기계 · 예상 수익</span><span class="val small" id="su-info">기계 0대</span></div>
+      <div class="cell"><span class="lbl">직원 · 인건비</span><span class="val small" id="su-staff">없음</span></div>
+    </div>
+    <div class="chip promo hidden" id="su-promo-chip"></div>
+    <div class="chip alert hidden" id="su-alert"></div>
+    <div class="dock">
+      <button class="icon primary" id="su-trip"><span class="em">🚌</span>원정</button>
+      <button class="icon" id="su-whole"><span class="em">🚚</span>도매</button>
+      <button class="icon" id="su-inv"><span class="em">📦</span>창고</button>
+      <button class="icon" id="su-staffbtn"><span class="em">🧑‍🔧</span>직원</button>
+      <button class="icon" id="su-promo"><span class="em">📣</span>홍보</button>
+      <button class="icon" id="su-reviews"><span class="em">💬</span>리뷰</button>
+      <button class="icon" id="su-build"><span class="em">🔨</span>건축</button>
+      <button class="icon" id="su-help"><span class="em">❓</span>도움</button>
+    </div>
   </div>
 </div>
 
 <!-- 건축 모드 툴바 -->
 <div id="build-bar" class="hidden">
-  <span class="chip">🔨 건축 모드 · 바닥을 클릭해 배치, 기계를 클릭해 이동</span>
-  <button id="bb-buy">🛒 기계 구매</button>
-  <button class="ghost" id="bb-decor">🎨 바닥·벽·조명</button>
-  <button class="ghost" id="bb-name">✏️ 가게 이름</button>
-  <button class="ghost" id="bb-rot">🔄 회전 (R)</button>
-  <button class="ghost" id="bb-cancel">↩ 취소 (Esc)</button>
-  <button id="bb-done">✅ 완료</button>
-</div>
-
-<!-- 꾸미기 -->
-<div id="m-decor" class="modal hidden">
-  <button class="close">✕</button>
-  <h2>🎨 가게 꾸미기</h2>
-  <div class="hint">한 번 사면 계속 쓸 수 있다. 손님 눈에도 보인다(평점 소폭 보너스).</div>
-  <h3>바닥</h3><div id="decor-floor" class="list"></div>
-  <h3>벽</h3><div id="decor-wall" class="list"></div>
-  <h3>조명</h3><div id="decor-light" class="list"></div>
+  <span class="lbl">🔨 바닥 클릭 = 배치 · 기계 클릭 = 이동 · R 회전 · Esc 취소</span>
+  <button id="bb-buy">🛒 구매</button>
+  <button class="ghost" id="bb-decor">🎨 꾸미기</button>
+  <button class="ghost" id="bb-expand">🏗 증축</button>
+  <button class="ghost" id="bb-name">✏️ 이름</button>
+  <button class="ghost" id="bb-rot">🔄</button>
+  <button class="ghost" id="bb-cancel">↩</button>
+  <button class="ok" id="bb-done">✅ 완료</button>
 </div>
 
 <!-- 플레이 화면 UI -->
 <div id="play-ui" class="hidden">
-  <div class="topbar">
-    <div class="chip money" id="pu-money">0원</div>
-    <div class="chip" id="pu-shop">가게</div>
-    <div class="chip" id="pu-credit">크레딧 0</div>
-    <div class="spacer"></div>
-    <label class="chip" style="font-size:14px;cursor:pointer"><input type="checkbox" id="pu-auto" checked> 자동 시작</label>
-    <button class="ghost" id="pu-cam">🔁 시점 바꾸기 (C)</button>
-    <button class="ghost" id="pu-exit">🏠 내 가게로</button>
+  <div class="hud">
+    <div class="status">
+      <div class="cell"><span class="lbl">보유 현금</span><span class="val money" id="pu-money">0원</span></div>
+      <div class="cell"><span class="lbl">기계</span><span class="val small" id="pu-shop">가게</span></div>
+      <div class="cell"><span class="lbl">크레딧</span><span class="val" id="pu-credit">0</span></div>
+    </div>
+    <div class="dock">
+      <label class="chip" style="cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="pu-auto" checked> 자동 시작</label>
+      <button class="icon" id="pu-cam"><span class="em">🔁</span>시점 (C)</button>
+      <button class="icon" id="pu-exit"><span class="em">🏠</span>내 가게</button>
+    </div>
   </div>
   <div id="pu-desc"></div>
   <div id="pu-timer"><div id="pu-timer-fill"></div></div>
   <div id="pu-msg"></div>
+  <div id="pip-frame"><span class="cap" id="pip-cap">탑뷰</span></div>
   <div class="bottombar">
     <button id="pu-coin">💰 500원 넣기</button>
-    <button id="pu-start">▶ 시작</button>
+    <button class="ok" id="pu-start">▶ 시작</button>
     <button class="ghost hidden" id="pu-skip">⏭ 다음 판</button>
   </div>
   <div id="pu-hint"></div>
@@ -146,92 +195,125 @@
 <div id="backdrop" class="backdrop hidden"></div>
 
 <!-- 원정 목록 -->
-<div id="m-trip" class="modal hidden">
-  <button class="close">✕</button>
+<div id="m-trip" class="modal hidden"><button class="close">✕</button>
   <h2>🚌 원정 가기</h2>
-  <div class="hint">다른 가게에서 내 돈으로 뽑아온 인형을 창고에 쌓고, 내 기계에 넣어 팔자.</div>
-  <div id="trip-list" class="list" style="margin-top:10px"></div>
+  <div class="body"><div class="hint">다른 가게에서 내 돈으로 뽑아온 상품을 창고에 쌓고, 내 기계에 넣어 팔자.</div>
+  <div id="trip-list" class="list" style="margin-top:10px"></div></div>
 </div>
 
 <!-- 창고 -->
-<div id="m-inv" class="modal hidden">
-  <button class="close">✕</button>
+<div id="m-inv" class="modal hidden"><button class="close">✕</button>
   <h2>📦 창고</h2>
-  <div class="hint">직접 팔면 시세의 50%. 기계에 넣어두면 손님이 돈을 내고 뽑아간다.</div>
-  <div id="inv-list" class="list" style="margin-top:10px"></div>
+  <div class="body"><div class="hint">직접 팔면 시세의 50%. 기계에 넣어두면 손님이 돈을 내고 뽑아간다.</div>
+  <div id="inv-list" class="list" style="margin-top:10px"></div></div>
 </div>
 
-<!-- 빈 슬롯: 기계 구매 -->
-<div id="m-buy" class="modal hidden">
-  <button class="close">✕</button>
-  <h2>🛒 기계 구매</h2>
-  <div id="buy-list" class="list"></div>
+<!-- 구매 -->
+<div id="m-buy" class="modal hidden"><button class="close">✕</button>
+  <h2>🛒 기계·시설 구매</h2>
+  <div class="body"><div id="buy-list" class="list"></div></div>
 </div>
 
 <!-- 기계 관리 -->
-<div id="m-machine" class="modal hidden">
-  <button class="close">✕</button>
+<div id="m-machine" class="modal hidden"><button class="close">✕</button>
   <h2 id="pm-title">기계</h2>
-  <div id="pm-stats"></div>
-  <div class="row">플레이 가격 <input id="pm-price" type="number" step="100" min="100"> 원 <span class="hint" id="pm-hint"></span></div>
-  <div class="row" id="pm-clawrow">집게 힘 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
-    피티 <select id="pm-pity"><option value="0">없음</option><option value="10">10판</option><option value="20">20판</option><option value="30">30판</option><option value="50">50판</option></select>
-    집게 크기 <select id="pm-claw"><option value="1">보통</option><option value="0.65">작은 집게</option></select></div>
-  <div class="hint" id="pm-eco"></div>
-  <div class="hint" id="pm-clawhint">느슨하면 손님이 "너무해"라며 평점을 깎고 발길이 준다. 짱짱하면 인형이 빨리 빠져나가지만 평점이 오른다.</div>
-  <div class="hint hidden" id="pm-gachahint">가챠: 손님은 무조건 하나 받아간다. 가격이 평균 시세보다 비싸면 "바가지" 리뷰가 달린다. 재고 처리에 쓰자.</div>
-  <div class="row" id="pm-tryrow"><button class="ghost" id="pm-try">🕹 내 기계 직접 해보기 (무료)</button></div>
-  <h3>기계 안 인형 (<span id="pm-count"></span>)</h3>
-  <div id="pm-stock" class="list"></div>
-  <h3>창고에서 넣기</h3>
-  <div id="pm-inv" class="list"></div>
-  <div class="row" style="margin-top:12px"><button class="ghost" id="pm-sell">기계 팔기 (50%)</button></div>
-</div>
-
-<!-- 도매 -->
-<div id="m-whole" class="modal hidden">
-  <button class="close">✕</button>
-  <h2>🚚 도매 시장</h2>
-  <div class="hint">10분마다 물건이 바뀐다. 일반·고급 인형만 취급. 희귀·전설은 원정 가서 직접 뽑아야 한다. <span id="whole-timer"></span></div>
-  <div id="whole-list" class="list" style="margin-top:10px"></div>
-</div>
-
-<!-- 홍보 -->
-<div id="m-promo" class="modal hidden">
-  <button class="close">✕</button>
-  <h2>📣 홍보</h2>
-  <div class="hint" id="promo-now"></div>
-  <div id="promo-list" class="list" style="margin-top:10px"></div>
-</div>
-
-<!-- 리뷰 -->
-<div id="m-reviews" class="modal hidden">
-  <button class="close">✕</button>
-  <h2>💬 손님 리뷰</h2>
-  <div id="review-summary"></div>
-  <div id="review-list" class="list" style="margin-top:10px"></div>
-</div>
-
-<!-- 도움말 -->
-<div id="m-help" class="modal hidden">
-  <button class="close">✕</button>
-  <h2>❓ 어떻게 노나</h2>
-  <div class="hint" style="font-size:14px; line-height:1.6">
-    1. <b>원정</b>에서 다른 가게 기계에 돈 넣고 인형을 뽑는다. (내돈내산)<br>
-    2. 뽑은 인형은 <b>창고</b>로. 직접 팔거나 내 기계에 넣는다.<br>
-    3. 빈 자리를 클릭해 <b>기계</b>를 사고, 인형을 넣고 가격·집게 세팅을 정하면 손님이 온다.<br>
-    4. 손님은 기대값(당첨률×인형시세 ÷ 가격)이 높을수록 많이 온다. 너무해 세팅은 손님이 안 온다.<br><br>
-    <b>뽑기 팁</b>: 집게는 진짜 물리로 잡는다. 손가락이 인형 아래를 걸어야 들리고, 집게 힘이 인형 무게를 못 버티면 손가락이 벌어지며 흘러내린다.
-    정중앙·위에 얹힌 인형이 잘 잡힌다. 느슨한 곳은 들고 가다 떨어지니 상품구 옆 인형을 밀거나 탑을 쌓아라. 작은 집게는 큰 인형을 못 감싼다.
-    <b>회오리</b>: 조이스틱을 0.5초 간격으로 좌우 반전하면 집게가 크게 흔들린다. 흔들리는 채로 내리면 인형을 쳐서 밀거나 착지 위치를 바꿀 수 있다. 피티 기계는 LED 카운터를 세라.
+  <div class="tabs" id="pm-tabs"><button class="on" data-tab="set">설정</button><button data-tab="stock">재고</button><button data-tab="stat">통계</button></div>
+  <div class="body">
+    <div id="pm-broken" class="banner bad hidden"></div>
+    <div class="tab on" data-tab="set">
+      <div class="row">플레이 가격 <input id="pm-price" type="number" step="100" min="100"> 원 <span class="hint" id="pm-hint"></span></div>
+      <div class="row" id="pm-clawrow">집게 힘 <select id="pm-grip"><option value="loose">느슨함 (너무해)</option><option value="normal">보통</option><option value="strong">짱짱함</option></select>
+        피티 <select id="pm-pity"><option value="0">없음</option><option value="10">10판</option><option value="20">20판</option><option value="30">30판</option><option value="50">50판</option></select>
+        집게 크기 <select id="pm-claw"><option value="1">보통</option><option value="0.65">작은 집게</option></select></div>
+      <div class="hint" id="pm-eco"></div>
+      <div class="hint" id="pm-clawhint">느슨하면 손님이 "너무해"라며 평점을 깎고 발길이 준다. 짱짱하면 상품이 빨리 빠져나가지만 평점이 오른다.</div>
+      <div class="hint hidden" id="pm-gachahint">가챠: 손님은 무조건 하나 받아간다. 가격이 평균 시세보다 비싸면 "바가지" 리뷰가 달린다. 재고 처리에 쓰자.</div>
+      <div class="hint hidden" id="pm-facilityhint"></div>
+      <div class="row" id="pm-tryrow"><button class="ghost" id="pm-try">🕹 직접 해보기 (무료)</button><button class="ghost" id="pm-repair">🔧 수리</button><button class="danger" id="pm-sell">기계 팔기 (50%)</button></div>
+    </div>
+    <div class="tab" data-tab="stock">
+      <h3>기계 안 상품 (<span id="pm-count"></span>)</h3>
+      <div id="pm-stock" class="list"></div>
+      <h3>창고에서 넣기</h3>
+      <div id="pm-inv" class="list"></div>
+    </div>
+    <div class="tab" data-tab="stat">
+      <div id="pm-stats"></div>
+      <div class="hint" id="pm-cond"></div>
+    </div>
   </div>
 </div>
 
+<!-- 도매 -->
+<div id="m-whole" class="modal hidden"><button class="close">✕</button>
+  <h2>🚚 도매 시장</h2>
+  <div class="body"><div class="hint">10분마다 물건이 바뀐다. 일반·고급 상품만 취급. 희귀·전설은 원정 가서 직접 뽑아야 한다. <span id="whole-timer"></span></div>
+  <div id="whole-list" class="list" style="margin-top:10px"></div></div>
+</div>
+
+<!-- 직원 -->
+<div id="m-staff" class="modal hidden"><button class="close">✕</button>
+  <h2>🧑‍🔧 직원</h2>
+  <div class="body"><div class="hint">시급은 1분마다 자동으로 빠져나간다. 돈이 없으면 그만둔다.</div>
+  <div id="staff-list" class="list" style="margin-top:10px"></div></div>
+</div>
+
+<!-- 홍보 -->
+<div id="m-promo" class="modal hidden"><button class="close">✕</button>
+  <h2>📣 홍보</h2>
+  <div class="body"><div class="hint" id="promo-now"></div>
+  <div id="promo-list" class="list" style="margin-top:10px"></div></div>
+</div>
+
+<!-- 리뷰 -->
+<div id="m-reviews" class="modal hidden"><button class="close">✕</button>
+  <h2>💬 손님 리뷰</h2>
+  <div class="body"><div id="review-summary"></div>
+  <div id="review-list" class="list" style="margin-top:10px"></div></div>
+</div>
+
+<!-- 꾸미기 -->
+<div id="m-decor" class="modal hidden"><button class="close">✕</button>
+  <h2>🎨 가게 꾸미기</h2>
+  <div class="body"><div class="hint">한 번 사면 계속 쓸 수 있다. 손님 눈에도 보인다(평점 소폭 보너스).</div>
+  <h3>바닥</h3><div id="decor-floor" class="list"></div>
+  <h3>벽</h3><div id="decor-wall" class="list"></div>
+  <h3>조명</h3><div id="decor-light" class="list"></div></div>
+</div>
+
+<!-- 증축 -->
+<div id="m-expand" class="modal hidden"><button class="close">✕</button>
+  <h2>🏗 건물 증축</h2>
+  <div class="body"><div class="hint">바닥이 넓어지면 기계와 시설을 더 놓을 수 있다. 기존 배치는 유지된다.</div>
+  <div id="expand-list" class="list" style="margin-top:10px"></div></div>
+</div>
+
+<!-- 전화 이벤트 -->
+<div id="m-call" class="modal hidden" style="width:min(460px,94vw)">
+  <h2><span class="ring">📞</span> 전화가 왔다</h2>
+  <div class="body"><div class="banner info" id="call-text"></div>
+  <div class="row" style="margin-top:12px"><button class="ok" id="call-refund">환불해준다</button><button class="danger" id="call-ignore">바쁘다고 끊는다</button></div>
+  <div class="hint" id="call-hint"></div></div>
+</div>
+
+<!-- 도움말 -->
+<div id="m-help" class="modal hidden"><button class="close">✕</button>
+  <h2>❓ 어떻게 노나</h2>
+  <div class="body"><div class="hint" style="font-size:13.5px">
+    1. <b>원정</b>에서 다른 가게 기계에 돈 넣고 상품을 뽑는다. (내돈내산)<br>
+    2. 뽑은 상품은 <b>창고</b>로. 직접 팔거나 내 기계에 넣는다. <b>도매</b>에서 일반·고급 상품을 사올 수도 있다.<br>
+    3. <b>건축</b>에서 기계·시설을 사서 원하는 자리에 놓고, 상품을 넣고 가격·집게 세팅을 정하면 손님이 온다.<br>
+    4. 손님은 기대값(당첨률×시세 ÷ 가격)이 높을수록 많이 온다. 너무해 세팅은 손님이 안 오고 평점이 떨어진다.<br>
+    5. 기계는 쓸수록 마모돼 고장 난다. 방치하면 돈만 먹고 전화가 온다. 기술자를 고용하면 알아서 고친다.<br><br>
+    <b>뽑기 팁</b>: 집게는 진짜 물리로 잡는다. 손가락이 상품 아래를 걸어야 들리고, 집게 힘이 무게를 못 버티면 흘러내린다.
+    <b>회오리</b>: 조이스틱을 0.5초 간격으로 좌우 반전하면 집게가 크게 흔들린다. 스위트박스는 판 위에 쌓아라. UFO는 봉 끝으로 밀어라. 푸시 캐처는 누가 밀어둔 걸 가로채라.
+  </div></div>
+</div>
+
 <!-- 부재중 수익 -->
-<div id="m-offline" class="modal hidden">
-  <button class="close">✕</button>
+<div id="m-offline" class="modal hidden"><button class="close">✕</button>
   <h2>💤 다녀오신 동안</h2>
-  <div id="offline-body"></div>
+  <div class="body"><div id="offline-body"></div></div>
 </div>
 
 <div id="toast"></div>
