@@ -266,7 +266,7 @@ export class StoreScene {
     if (kind === 'ufo'){ keys.slice(0,6).forEach((k, j) => { const mesh = buildPlushMesh(k); mesh.position.set(-m.w/2+0.3 + j*0.22, 0.4, 0); mesh.rotation.x = Math.PI/2; s.cab.interior.add(mesh); s.plushMeshes.push(mesh); }); }
     else if (kind === 'pusher'){ keys.slice(0,6).forEach((k, j) => { const mesh = buildPlushMesh(k); mesh.position.set(-m.w/2+0.25 + j*0.25, 0.48, -m.d/2+0.42); s.cab.interior.add(mesh); s.plushMeshes.push(mesh); }); }
     else {
-      const x0 = kind === 'sweet' ? -m.w/2 + 0.7 : -m.w/2 + 0.2, x1 = m.w/2 - 0.2, z0 = -m.d/2 + 0.2, z1 = m.d/2 - 0.2;
+      const x0 = kind === 'sweet' ? -m.w/2 + 0.9 : -m.w/2 + 0.2, x1 = m.w/2 - 0.2, z0 = -m.d/2 + 0.2, z1 = m.d/2 - 0.2;
       const cols = Math.max(1, Math.floor((x1 - x0)/0.28) + 1), rows = Math.max(1, Math.floor((z1 - z0)/0.28) + 1);
       keys.forEach((k, j) => {
         const mesh = buildPlushMesh(k);
@@ -628,6 +628,6 @@ export class StoreScene {
     }
     this.updateWanderers(dt);
     const tt = performance.now()/1000;
-    this.slots.forEach(s => { if (!s || !s.cab) return; if (s.cab.plate) s.cab.plate.position.z = -machineDef(this.save.slots[s.i].machine).d/2 + 0.25 + 0.1*(1+Math.sin(tt*2)); const broken = !!this.save.slots[s.i]?.broken; s.cab.lights.forEach((l,i) => { l.material.emissiveIntensity = broken ? (Math.random() < 0.1 ? 1 : 0.05) : ((Math.floor(tt*3)+i)%2 ? 1 : 0.15); }); });
+    this.slots.forEach(s => { if (!s || !s.cab) return; if (s.cab.plate) s.cab.plate.position.z = -machineDef(this.save.slots[s.i].machine).d/2 + 0.02 + 0.25 + 0.16*(1+Math.sin(tt*1.85)); const broken = !!this.save.slots[s.i]?.broken; s.cab.lights.forEach((l,i) => { l.material.emissiveIntensity = broken ? (Math.random() < 0.1 ? 1 : 0.05) : ((Math.floor(tt*3)+i)%2 ? 1 : 0.15); }); });
   }
 }

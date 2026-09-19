@@ -21,7 +21,7 @@ export const KIND = {
   pusher: { style:'pusher' },
 };
 // 기계 바닥 점유 크기 (가게 배치용): 콘솔 앞부분 포함
-export const SWEET = { DW:0.5, deckY:0.28, amp:0.1, period:3.2 };
+export const SWEET = { DW:0.7, deckY:0.28, amp:0.16, period:3.4, pit:0.42, plateL:0.5, stop:0.33, plateH:0.12 }; // stop: 뒤끝 기준 스토퍼 위치 = 판 앞끝(후퇴 시) 바로 뒤
 export function footprint(spec){
   const k = KIND[spec.kind || 'claw'] || KIND.claw;
   if (spec.type === 'gacha') return { w: spec.w + 0.2, d: spec.d + 0.3 };
@@ -97,18 +97,21 @@ function buildClawCabinet(spec, style){
   const bridge = style === 'ufo';
   let plate = null;
   if (style === 'sweet'){
-    const DW = 0.5, deckY = 0.28, zBack = -d/2+0.02, zFront = d/2-0.28;
+    const DW = SWEET.DW, deckY = SWEET.deckY, zBack = -d/2+0.02, zFront = d/2-SWEET.pit;
     interior.add(box(w-DW, 0.06, d, 0x9fd68f, DW/2, -0.03, 0));                 // 오른쪽 더미 바닥(잔디)
     interior.add(box(DW, 0.06, zFront+d/2, 0xffffff, -w/2+DW/2, -0.03, (zFront-d/2)/2)); // 왼쪽 바닥(구덩이 앞까지)
     interior.add(box(DW, deckY, zFront-zBack, 0xf6f6f8, -w/2+DW/2, deckY/2, (zBack+zFront)/2));   // 아랫판(고정 받침)
-    interior.add(box(0.03, deckY+0.16, zFront-zBack, 0xff8fab, -w/2+DW+0.015, (deckY+0.16)/2, (zBack+zFront)/2)); // 오른쪽 낮은 칸막이
+    interior.add(box(0.03, deckY+0.55, zFront-zBack, 0xff8fab, -w/2+DW+0.015, (deckY+0.55)/2, (zBack+zFront)/2)); // 오른쪽 칸막이(인형이 못 넘어가게)
+    interior.add(box(DW-0.04, 0.2, 0.04, 0xc9ced8, -w/2+DW/2, deckY+SWEET.plateH+0.12, zBack+SWEET.stop, { metalness:0.6, roughness:0.35 })); // 스토퍼 바
+    const back = new THREE.Mesh(new THREE.BoxGeometry(DW-0.04, 0.7, 0.03), new THREE.MeshStandardMaterial({ color:0xffc3d6, transparent:true, opacity:0.55, roughness:0.4 })); back.position.set(-w/2+DW/2, deckY+SWEET.plateH+0.35, zBack+SWEET.stop-0.03); interior.add(back); // 뒷판: 스토퍼 뒤로 인형이 못 넘어감: 판이 빠질 때 인형을 잡아 앞으로 떨어뜨림
     // 배출구(앞쪽 구덩이)
     interior.add(box(DW, 0.02, d/2-zFront-0.02, 0x0d0d12, -w/2+DW/2, -0.5, (zFront+d/2)/2));
     interior.add(box(DW, 0.5, 0.02, 0x1a1a22, -w/2+DW/2, -0.25, zFront+0.01));
     interior.add(box(0.02, 0.5, d/2-zFront, 0x1a1a22, -w/2+DW-0.01, -0.25, (zFront+d/2)/2));
     // 윗판(왕복)
-    plate = box(DW-0.02, 0.06, 0.46, 0xffd6e6, 0, 0, 0); plate.position.set(-w/2+DW/2, deckY+0.03, zBack+0.23); interior.add(plate);
-    const stripe = box(DW-0.02, 0.01, 0.05, 0xff5c8a, 0, 0.035, 0.2); plate.add(stripe);
+    plate = box(DW-0.02, SWEET.plateH, SWEET.plateL, 0xffd6e6, 0, 0, 0); plate.position.set(-w/2+DW/2, deckY+SWEET.plateH/2, zBack+SWEET.plateL/2); interior.add(plate);
+    interior.add(box(DW, 0.01, SWEET.pit-0.02, 0xff5c8a, -w/2+DW/2, -0.49, (zFront+d/2)/2)); // 구덩이 바닥 표시
+    const stripe = box(DW-0.02, 0.01, 0.05, 0xff5c8a, 0, SWEET.plateH/2+0.005, SWEET.plateL/2-0.03); plate.add(stripe);
   }
   if (bridge){
     // 브릿지: 바닥 전체가 구덩이, 봉 두 개 위에 상품이 얹힘
@@ -246,6 +249,7 @@ function makeWorld(self, w, d, h, opts={}){
   self.world = world;
   self.plushMat = new CANNON.Material('plush'); self.wallMat = new CANNON.Material('wall');
   self.fingerMat = new CANNON.Material('finger'); self.headMat = new CANNON.Material('head');
+  self.plateMat = new CANNON.Material('plate');   // 밀판: 마찰 딱딱하게(인형이 판과 같이 움직이게)
   const soft = { contactEquationStiffness:8e5, contactEquationRelaxation:4, frictionEquationStiffness:8e5, frictionEquationRelaxation:4 };
   world.defaultContactMaterial.restitution = 0; world.defaultContactMaterial.contactEquationStiffness = 8e5; world.defaultContactMaterial.contactEquationRelaxation = 4;
   world.addContactMaterial(new CANNON.ContactMaterial(self.plushMat, self.plushMat, { friction:0.8, restitution:0, ...soft }));
@@ -254,6 +258,7 @@ function makeWorld(self, w, d, h, opts={}){
   world.addContactMaterial(new CANNON.ContactMaterial(self.plushMat, self.headMat, { friction:0.4, restitution:0, ...soft }));
   world.addContactMaterial(new CANNON.ContactMaterial(self.fingerMat, self.fingerMat, { friction:0.2, restitution:0 }));
   world.addContactMaterial(new CANNON.ContactMaterial(self.fingerMat, self.wallMat, { friction:0.3, restitution:0 }));
+  world.addContactMaterial(new CANNON.ContactMaterial(self.plushMat, self.plateMat, { friction:1.2, restitution:0, contactEquationStiffness:1e7, contactEquationRelaxation:3, frictionEquationStiffness:1e7, frictionEquationRelaxation:2 }));
   const addBox = (hx,hy,hz,x,y,z) => { const b = new CANNON.Body({ mass:0, material:self.wallMat }); b.addShape(new CANNON.Box(new CANNON.Vec3(hx,hy,hz))); b.position.set(x,y,z); world.addBody(b); return b; };
   self.addStaticBox = addBox;
   // 벽 + 천장 (바닥은 종류별)
@@ -296,7 +301,7 @@ export class ClawMachine {
     this.group = this.cab.root;
     const { w, d, h } = spec;
     this.cs = this.cab.cs;
-    this.home = this.bridge ? { x:-w/2+0.25, z:0 } : this.deck ? { x:-w/2+SWEET.DW/2, z:-d/2+0.02+0.3 } : { x:-w/2+CHUTE/2, z:d/2-CHUTE/2 };
+    this.home = this.bridge ? { x:-w/2+0.25, z:0 } : this.deck ? { x:-w/2+SWEET.DW/2, z:-d/2+0.02+SWEET.stop+0.18 } : { x:-w/2+CHUTE/2, z:d/2-CHUTE/2 };
     this.railY = h - 0.09;
     this.anchorY = this.railY - 0.05;
     this.L0 = spec.cable || 0.22;
@@ -322,14 +327,16 @@ export class ClawMachine {
       [-1,1].forEach(sg => addBox((bx1-bx0)/2, 0.025, 0.025, (bx0+bx1)/2, 0.3, sg*(gap/2+0.025)));
       this.bridgeEnd = bx1;
     } else if (this.deck){
-      const DW = SWEET.DW, deckY = SWEET.deckY, zBack = -d/2+0.02, zFront = d/2-0.28;
+      const DW = SWEET.DW, deckY = SWEET.deckY, zBack = -d/2+0.02, zFront = d/2-SWEET.pit;
       addBox((w-DW)/2, 0.05, d/2, DW/2, -0.05, 0);                                   // 오른쪽 바닥
       addBox(DW/2, 0.05, (zFront-zBack)/2 + 0.0, -w/2+DW/2, -0.05, (zBack+zFront)/2 - 0.0); // 왼쪽 바닥(구덩이 앞 제외)
-      addBox(DW/2, deckY/2, (zFront-zBack)/2, -w/2+DW/2, deckY/2, (zBack+zFront)/2);   // 아랫판
-      addBox(0.015, (deckY+0.16)/2, (zFront-zBack)/2, -w/2+DW+0.015, (deckY+0.16)/2, (zBack+zFront)/2); // 칸막이
-      this.plateBody = new CANNON.Body({ mass:0, type:CANNON.Body.KINEMATIC, material:this.wallMat });
-      this.plateBody.addShape(new CANNON.Box(new CANNON.Vec3(DW/2-0.01, 0.03, 0.23)));
-      this.plateBody.position.set(-w/2+DW/2, deckY+0.03, zBack+0.23); this.world.addBody(this.plateBody);
+      { const b = new CANNON.Body({ mass:0, material:this.plateMat }); b.addShape(new CANNON.Box(new CANNON.Vec3(DW/2, deckY/2, (zFront-zBack)/2))); b.position.set(-w/2+DW/2, deckY/2, (zBack+zFront)/2); this.world.addBody(b); }   // 아랫판(딱딱한 접촉)
+      addBox(0.015, (deckY+0.55)/2, (zFront-zBack)/2, -w/2+DW+0.015, (deckY+0.55)/2, (zBack+zFront)/2); // 칸막이
+      addBox(DW/2-0.02, 0.1, 0.02, -w/2+DW/2, deckY+SWEET.plateH+0.12, zBack+SWEET.stop); // 스토퍼 바
+      addBox(DW/2-0.02, 0.35, 0.015, -w/2+DW/2, deckY+SWEET.plateH+0.35, zBack+SWEET.stop-0.03); // 뒷판
+      this.plateBody = new CANNON.Body({ mass:0, type:CANNON.Body.KINEMATIC, material:this.plateMat });
+      this.plateBody.addShape(new CANNON.Box(new CANNON.Vec3(DW/2-0.01, SWEET.plateH/2, SWEET.plateL/2)));
+      this.plateBody.position.set(-w/2+DW/2, deckY+SWEET.plateH/2, zBack+SWEET.plateL/2); this.world.addBody(this.plateBody);
       this.deckZFront = zFront; this.deckZBack = zBack;
     } else {
       addBox((w-CHUTE)/2, 0.05, d/2, CHUTE/2, -0.05, 0);
@@ -493,7 +500,7 @@ export class ClawMachine {
     this.applyMotors(h);
     this.placeFingers(h);
     if (this.plateBody){
-      const pb = this.plateBody, tz = this.deckZBack + 0.23 + SWEET.amp*(1+Math.sin(this.time*Math.PI*2/SWEET.period))/1;
+      const pb = this.plateBody, tz = this.deckZBack + SWEET.plateL/2 + SWEET.amp*(1+Math.sin(this.time*Math.PI*2/SWEET.period));
       pb.velocity.set(0, 0, (tz - pb.position.z)/h);
     }
     this.world.step(H);
