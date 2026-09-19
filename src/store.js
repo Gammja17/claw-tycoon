@@ -490,7 +490,8 @@ export class StoreScene {
     if (!mv.path || mv.navV !== this.navVersion){ mv.path = this.findPath(mv.g.position, mv.target); mv.navV = this.navVersion; }
     const dst = mv.path[0];
     const dir = dst.clone().sub(mv.g.position); dir.y = 0; const dist = dir.length();
-    if (dist < (mv.outside ? 0.35 : 0.06)){ mv.path.shift(); if (!mv.path.length){
+    const tol = mv.outside ? 0.35 : (mv.path.length === 1 && (mv.leaving || mv.phase === 'out')) ? 0.3 : 0.06;   // 나갈 때는 문 근처에서 느슨하게 (밀려서 못 닿는 정체 방지)
+    if (dist < tol){ mv.path.shift(); if (!mv.path.length){
         if (mv.outside === 'in'){ mv.outside = null; mv.path = null; return false; }        // 문 앞 도착 → 안쪽 목표로 내비
         if (mv.outside === 'leave'){ mv.outside = 'gone'; return true; }
         if (this.floor === 0 && (mv.leaving || mv.phase === 'out') && !mv.outside){ const o = this.outsidePts(); mv.path = [o.front, o.walk, o.far]; mv.navV = this.navVersion; mv.outside = 'leave'; return false; }
@@ -506,10 +507,11 @@ export class StoreScene {
   // 사람끼리 겹치지 않게 + 기계/소품 영역 밖으로 밀어내기
   separate(dt){
     const people = [...this.customers.filter(c => c.phase !== 'play' && c.phase !== 'react').map(c => c.g), ...this.wanderers.filter(w => !w.sitting && w.g.visible && !(w.wait > 0)).map(w => w.g)];
-    const R = 0.42;
+    const R = 0.36, fz = this.F.z1 + 0.7;
+    const doorZone = (p) => this.floor === 0 && Math.abs(p.x) < 1.0 && Math.abs(p.z - fz) < 1.2;
     for (let i=0;i<people.length;i++) for (let j=i+1;j<people.length;j++){
       const a = people[i].position, b = people[j].position; const dx = b.x-a.x, dz = b.z-a.z; const d = Math.hypot(dx, dz);
-      if (d < R && d > 1e-4){ const push = (R - d)/2 * 0.6, nx = dx/d, nz = dz/d; a.x -= nx*push; a.z -= nz*push; b.x += nx*push; b.z += nz*push; }
+      if (d < R && d > 1e-4){ const k = (doorZone(a) || doorZone(b)) ? 0.25 : 0.6; const push = (R - d)/2 * k, nx = dx/d, nz = dz/d; a.x -= nx*push; a.z -= nz*push; b.x += nx*push; b.z += nz*push; }
     }
     const rects = this.save.slots.filter(d => d && (d.floor||0) === this.floor).map(d => slotRect(d)).concat(this.propRects);
     if (this.F.stairs) rects.push(this.F.stairs);
@@ -522,6 +524,7 @@ export class StoreScene {
         if (mn === dl) p.x = r.x0-m; else if (mn === dr) p.x = r.x1+m; else if (mn === dn) p.z = r.z0-m; else p.z = r.z1+m;
       }
       const F = this.F; if (p.z < F.z1 + 0.5){ p.x = clamp(p.x, F.x0+0.2, F.x1-0.2); }
+      if (this.floor === 0 && Math.abs(p.z - fz) < 0.3) p.x = clamp(p.x, -0.45, 0.45);   // 앞 유리벽 통과 금지: 문 틈으로만
     }
   }
   cleanToilet(){ this.save.toiletDirt = 0; this.save.rep = clamp((this.save.rep??3) + 0.05, 1, 5); sfx.buy(); if (this.hooks.onChange) this.hooks.onChange(); }
@@ -713,7 +716,7 @@ export class StoreScene {
     const benches = this.facilitySlots('bench').length;
     const want = machines === 0 ? 0 : Math.min(20, Math.round((1 + machines*1.5 + (this.save.rep ?? 3)*1.2 + benches*2) * Math.min(1.8, this.promoMult())));
     this.wanderT = (this.wanderT || 0) + dt;
-    if (this.wanderers.length < want && this.wanderT > 0.8){ this.wanderT = 0; const w = { g:this.makePerson(), target:null, wait:0, t:rand(0,10), speed:rand(0.8, 1.3), leaving:false, path:null, sayT:rand(5,20) }; w.target = this.wanderTarget(w); this.enterFromOutside(w); this.wanderers.push(w); }
+    if (this.wanderers.length < want && this.wanderT > 1.4){ this.wanderT = 0; const w = { g:this.makePerson(), target:null, wait:0, t:rand(0,10), speed:rand(0.8, 1.3), leaving:false, path:null, sayT:rand(5,20) }; w.target = this.wanderTarget(w); this.enterFromOutside(w); this.wanderers.push(w); }
     if (this.wanderers.length > want && this.wanderT > 0.8){ this.wanderT = 0; const w = this.wanderers.find(x => !x.leaving && !x.visit); if (w){ w.leaving = true; w.target = this.DOOR.clone(); w.path = null; w.wait = 0; } }
     for (let k=this.wanderers.length-1; k>=0; k--){
       const w = this.wanderers[k]; w.t += dt; w.sayT -= dt;
