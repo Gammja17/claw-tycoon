@@ -3,8 +3,8 @@ import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAV
 import { createMachine, BASE_H } from './machine.js';
 import { StoreScene, slotEconomy, machineDef, bdDef } from './store.js';
 import { box, lerp } from './util.js';
-import { sfx } from './audio.js';
-import { preload, CHARACTERS, PROPS } from './assets.js';
+import { sfx, setVolume, getVolume } from './audio.js';
+import { preload, CHARACTERS, PROPS, ENV } from './assets.js';
 
 // ---------- 저장 ----------
 function loadSave(){
@@ -22,7 +22,8 @@ function loadSave(){
   if (!s.wholesale) s.wholesale = { time:0, offers:[] };
   if (!s.reviews) s.reviews = [];
   if (!s.promo) s.promo = null;
-  if (!s.decor) s.decor = { floor:'tile', wall:'sky', light:'day', owned:['tile','sky','day'] };
+  if (!s.decor) s.decor = { floor:'tile', wall:'sky', light:'day', env:'city', owned:['tile','sky','day','city','none'] };
+  if (!s.decor.env) s.decor.env = 'city';
   if (!s.storeName) s.storeName = '내 인형뽑기 가게';
   if (!s.settings) s.settings = { autoStart:true, mainView:'front' };
   if (!s.staff) s.staff = {};
@@ -75,7 +76,7 @@ const store = new StoreScene(save, { onChange: refreshStoreHUD, floatText, say, 
 let mode = 'store';
 let play = null;
 // Kenney 모델 프리로드 → 소품·직원 다시 그리기
-preload([...CHARACTERS, ...PROPS]).then(() => { store.buildProps(); store.buildNav(); store.rebuildStaff(); store.rebuildAll(); });
+preload([...CHARACTERS, ...PROPS, ...ENV]).then(() => { store.buildProps(); store.buildEnv(); store.buildNav(); store.rebuildStaff(); store.rebuildAll(); });
 
 function resize(){
   renderer.setSize(innerWidth, innerHeight);
@@ -125,11 +126,11 @@ $('su-trip').onclick = () => {
   sfx.click();
   const list = $('trip-list'); list.innerHTML = '';
   SHOPS.forEach(sh => {
-    const el = document.createElement('div'); el.className = 'shop-card';
+    const el = document.createElement('div'); el.className = 'shop-card tile';
     const pool = [...new Set(sh.pool)].map(k => PLUSH_TYPES[k].name).join(', ');
-    el.innerHTML = `<div class="swatch" style="background:#${sh.color.toString(16).padStart(6,'0')}">${{mini:'🔬', sweet:'🍬', ufo:'🛸', pusher:'👉'}[sh.kind] || '🕹'}</div>
-      <div class="body"><div class="title">${sh.name} <span class="tag" style="background:#16a34a">1판 ${won(sh.cost)}</span></div>
-      <div class="desc">${sh.desc}</div><div class="desc">상품: ${pool} · 집게 ${GRIP_PRESETS[sh.grip].label}${sh.clawSize<1?' · 작은집게':''}${sh.swing<0.2?' · 회오리 잘 됨':''}${sh.pity?` · 피티 ${sh.pity}판`:''}</div></div>`;
+    el.innerHTML = `<div class="head"><div class="swatch" style="background:#${sh.color.toString(16).padStart(6,'0')}">${{mini:'🔬', sweet:'🍬', ufo:'🛸', pusher:'👉'}[sh.kind] || '🕹'}</div>
+      <div class="title">${sh.name}<br><span class="tag" style="background:#16a34a">1판 ${won(sh.cost)}</span></div></div>
+      <div class="desc" title="${sh.desc}">${sh.desc}</div><div class="desc" title="${pool}">집게 ${GRIP_PRESETS[sh.grip].label}${sh.clawSize<1?' · 작은집게':''}${sh.swing<0.2?' · 회오리':''}${sh.pity?` · 피티 ${sh.pity}판`:''} · ${pool}</div>`;
     const b = document.createElement('button'); b.textContent = '가기';
     b.onclick = () => { sfx.click(); closeModals(); enterPlay(sh); };
     el.appendChild(b); list.appendChild(el);
@@ -174,6 +175,10 @@ function renderWholesale(){
 }
 $('su-whole').onclick = () => { sfx.click(); renderWholesale(); openModal('m-whole'); };
 $('su-help').onclick = () => { sfx.click(); openModal('m-help'); };
+$('su-settings').onclick = () => { sfx.click(); $('set-vol').value = Math.round(getVolume()*100); $('set-vol-v').textContent = $('set-vol').value + '%'; openModal('m-settings'); };
+$('set-vol').oninput = e => { setVolume(e.target.value/100); $('set-vol-v').textContent = e.target.value + '%'; };
+$('set-vol').onchange = () => sfx.click();
+$('set-reset').onclick = () => { if (!confirm('정말 초기화할까? 가게·돈·창고·리뷰가 전부 사라진다.')) return; try { localStorage.removeItem(SAVE_KEY); } catch(e){} location.reload(); };
 // 직원
 function renderStaff(){
   const list = $('staff-list'); list.innerHTML = '';
@@ -267,15 +272,15 @@ function openBuyPanel(){
 }
 function renderDecor(){
   const owned = save.decor.owned || (save.decor.owned = ['tile','sky','day']);
-  const sw = (cat, o) => cat === 'floor' ? `#${o.base.toString(16).padStart(6,'0')}` : cat === 'wall' ? `#${o.color.toString(16).padStart(6,'0')}` : `#${o.bg.toString(16).padStart(6,'0')}`;
-  ['floor','wall','light'].forEach(cat => {
+  const sw = (cat, o) => cat === 'floor' ? `#${o.base.toString(16).padStart(6,'0')}` : cat === 'wall' ? `#${o.color.toString(16).padStart(6,'0')}` : cat === 'env' ? `#${o.sky.toString(16).padStart(6,'0')}` : `#${o.bg.toString(16).padStart(6,'0')}`;
+  ['floor','wall','light','env'].forEach(cat => {
     const list = $('decor-'+cat); list.innerHTML = '';
     DECOR[cat].forEach(o => {
       const el = document.createElement('div'); el.className = 'decor-card' + (save.decor[cat] === o.id ? ' on' : '');
       const has = owned.includes(o.id) || o.price === 0;
       el.innerHTML = `<div class="sw" style="background:${sw(cat,o)}"></div><div class="name">${o.name}<div class="hint">${has ? '보유' : won(o.price)}</div></div>`;
       const b = document.createElement('button'); b.className = 'sm'; b.textContent = save.decor[cat] === o.id ? '적용 중' : has ? '적용' : '구매·적용'; b.disabled = save.decor[cat] === o.id || (!has && save.money < o.price);
-      b.onclick = () => { if (!has){ save.money -= o.price; owned.push(o.id); sfx.buy(); save.rep = Math.min(5, save.rep + 0.05); } else sfx.click(); save.decor[cat] = o.id; store.applyDecor(); refreshStoreHUD(); renderDecor(); persist(); };
+      b.onclick = () => { if (!has){ save.money -= o.price; owned.push(o.id); sfx.buy(); save.rep = Math.min(5, save.rep + 0.05); } else sfx.click(); save.decor[cat] = o.id; if (cat === 'env') store.buildEnv(); store.applyDecor(); refreshStoreHUD(); renderDecor(); persist(); };
       el.appendChild(b); list.appendChild(el);
     });
   });
@@ -300,16 +305,42 @@ function renderExpand(){
 }
 
 // 캔버스 클릭/이동
-let pointerStart = null;
-renderer.domElement.addEventListener('pointerdown', e => { if (mode==='store') pointerStart = { x:e.clientX, y:e.clientY }; });
+let pointerStart = null, dragging = false, lastPt = null, dragBtn = 0;
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+let hold = null; // { i, t }
+const HOLD_T = 2.2;
+function startHold(i, e){ hold = { i, t:0 }; const h = $('hold'); h.style.left = e.clientX + 'px'; h.style.top = e.clientY + 'px'; h.style.setProperty('--p', '0%'); h.classList.add('on'); }
+function endHold(){ if (hold){ hold = null; $('hold').classList.remove('on'); } }
+function tickHold(dt){
+  if (!hold) return; hold.t += dt; $('hold').style.setProperty('--p', Math.min(100, hold.t/HOLD_T*100) + '%');
+  if (hold.t >= HOLD_T){ store.cleanToilet(); const d = save.slots[hold.i]; if (d) floatText(new THREE.Vector3(d.x, 2.2, d.z), '✨ 청소 완료', 'win'); toast('화장실 청소 완료 ✨ 평점 +0.05'); endHold(); pointerStart = null; persist(); }
+}
+renderer.domElement.addEventListener('pointerdown', e => { if (mode==='store'){ pointerStart = { x:e.clientX, y:e.clientY }; lastPt = { x:e.clientX, y:e.clientY }; dragging = false; dragBtn = e.button;
+  if (e.button === 0 && !build.on){ const i = store.pick(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight*2-1))); const d = i !== null ? save.slots[i] : null; if (d && MY_MACHINES.find(m => m.id === d.machine)?.kind === 'toilet' && (save.toiletDirt||0) > 2) startHold(i, e); }
+} });
+renderer.domElement.addEventListener('pointerleave', endHold); renderer.domElement.addEventListener('pointercancel', endHold);
 renderer.domElement.addEventListener('pointermove', e => {
-  if (mode !== 'store' || !build.on || !store.ghost) return;
+  if (mode !== 'store') return;
+  if (pointerStart && e.buttons){
+    if (!dragging && Math.hypot(e.clientX-pointerStart.x, e.clientY-pointerStart.y) > 6){ dragging = true; endHold(); }
+    if (dragging && !(build.on && store.ghost && dragBtn === 0)){
+      const dx = e.clientX - lastPt.x, dy = e.clientY - lastPt.y;
+      if (dragBtn === 2 || e.shiftKey) store.rotateBy(dx); else store.panBy(dx, dy);
+    }
+    lastPt = { x:e.clientX, y:e.clientY };
+  }
+  if (!build.on || !store.ghost) return;
   const p = store.pickFloor(new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight*2-1)));
   if (p) store.moveGhost(p.x, p.z, build.moveIdx);
 });
+renderer.domElement.addEventListener('wheel', e => { if (mode !== 'store') return; e.preventDefault(); store.zoomBy(e.deltaY > 0 ? 1.1 : 0.9); }, { passive:false });
+renderer.domElement.addEventListener('dblclick', e => { if (mode === 'store'){ store.resetCamera(); } });
 renderer.domElement.addEventListener('pointerup', e => {
+  endHold();
   if (mode !== 'store' || !pointerStart) return;
-  if (Math.hypot(e.clientX-pointerStart.x, e.clientY-pointerStart.y) > 8) return;
+  const wasDrag = dragging; dragging = false; const ps = pointerStart; pointerStart = null;
+  if (wasDrag || e.button !== 0) return;
+  if (Math.hypot(e.clientX-ps.x, e.clientY-ps.y) > 8) return;
   const ndc = new THREE.Vector2(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight*2-1));
   if (build.on){
     if (store.ghost){
@@ -364,7 +395,7 @@ function openMachinePanel(i){
   $('pm-gachahint').classList.toggle('hidden', !gacha); $('pm-facilityhint').classList.toggle('hidden', !fac);
   $('pm-price').parentElement.classList.toggle('hidden', fac); $('pm-eco').classList.toggle('hidden', fac);
   document.querySelectorAll('#pm-tabs button')[1].classList.toggle('hidden', fac);
-  if (fac) $('pm-facilityhint').textContent = m.desc + (m.kind === 'toilet' ? ` 청결도: ${save.toiletDirt > 15 ? '더러움 😷 (청소 담당 고용 필요)' : save.toiletDirt > 8 ? '보통' : '깨끗 ✨'}` : '');
+  if (fac) $('pm-facilityhint').textContent = m.desc + (m.kind === 'toilet' ? ` 청결도: ${save.toiletDirt > 15 ? '더러움 😷' : save.toiletDirt > 8 ? '보통' : '깨끗 ✨'} — 가게 화면에서 화장실을 꾹 누르면 직접 청소(2초). 청소 담당을 고용하면 자동.` : '');
   document.querySelectorAll('#pm-tabs button')[0].click();
   const draw = () => {
     const eco = slotEconomy(s, save.rep, store.promoMult());
@@ -551,7 +582,7 @@ function loop(now){
   if (renderer.domElement.width !== Math.floor(innerWidth*renderer.getPixelRatio()) || renderer.domElement.height !== Math.floor(innerHeight*renderer.getPixelRatio())) resize();
   store.sim(dt, mode === 'store');
   if (mode === 'store'){
-    store.update(dt);
+    store.update(dt); tickHold(dt);
     renderer.setScissorTest(false); renderer.setViewport(0, 0, innerWidth, innerHeight);
     renderer.render(store.scene, store.camera);
     updateBubbles();
