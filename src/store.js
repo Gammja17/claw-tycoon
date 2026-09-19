@@ -106,7 +106,8 @@ export class StoreScene {
     Object.assign(this.sun.shadow.camera, { left:-10, right:10, top:12, bottom:-12, near:1, far:40 });
     this.scene.add(this.sun);
     this.neonLights = []; this.room = new THREE.Group(); this.scene.add(this.room); this.tileGroup = new THREE.Group(); this.scene.add(this.tileGroup);
-    this.sign = makeTextSprite('', { size:64, color:'#ff4f8b', bg:'rgba(255,255,255,0.9)', width:768, height:128 }); this.sign.scale.set(4.2, 0.7, 1); this.scene.add(this.sign);
+    this.sign = makeTextSprite('', { size:60, color:'#ff4f8b', bg:'rgba(255,255,255,0.92)', width:900, height:180 }); this.sign.scale.set(4.5, 0.9, 1); this.sign.userData.sign = true; this.scene.add(this.sign);
+    this.floor = 0;
     this.gridHelper = null;
     this.slots = []; this.customers = []; this.wanderers = []; this.staffFigs = []; this.navVersion = 0;
     this.raycaster = new THREE.Raycaster(); this.floorPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
@@ -127,6 +128,18 @@ export class StoreScene {
     this.DOOR = new THREE.Vector3(0, 0, this.F.z1 + 0.45);
     while (this.room.children.length) this.room.remove(this.room.children[0]);
     const zc = -4 + D/2;
+    const floors = this.save.floors || 1;
+    if (floors > 1){
+      // 계단(뒤쪽 오른쪽 구석). 위층에서는 계단이 출입구가 된다
+      const sx = this.F.x1 - 0.9, sz = this.F.z0 + 0.9;
+      const st = new THREE.Group(); st.position.set(sx, 0, sz); this.room.add(st);
+      for (let i=0;i<6;i++) st.add(box(1.2, 0.12, 0.28, 0xcfa77a, 0, 0.06 + i*0.12, -0.7 + i*0.28));
+      st.add(box(0.06, 1.0, 1.8, 0x8a6d4a, -0.62, 0.5, 0)); st.add(box(0.06, 1.0, 1.8, 0x8a6d4a, 0.62, 0.5, 0));
+      const lab = makeTextSprite(this.floor === 0 ? '⬆ 계단' : `${this.floor+1}F ⬇`, { size:56, color:'#241c2e', bg:'rgba(255,255,255,0.9)', width:384, height:128 }); lab.scale.set(0.9, 0.3, 1); lab.position.set(0, 1.6, 0); st.add(lab);
+      this.F.stairs = { x0:sx-0.8, x1:sx+0.8, z0:sz-1.1, z1:sz+1.2 };
+      if (this.floor > 0) this.DOOR = new THREE.Vector3(sx, 0, sz + 1.0);
+    } else this.F.stairs = null;
+    if (this.floor > 0){ const fl = makeTextSprite(`${this.floor+1}F`, { size:70, color:'#fff', bg:'rgba(124,92,255,0.9)', width:256, height:128 }); fl.scale.set(1.0, 0.5, 1); fl.position.set(-W/2+0.9, 2.5, -3.85); this.room.add(fl); }
     this.floorMesh = box(W, 0.1, D, 0xf7d9b5, 0, -0.05, zc); this.floorMesh.receiveShadow = true; this.room.add(this.floorMesh);
     this.walls = [box(W, 3.2, 0.2, 0xcfe8ff, 0, 1.6, -4.0), box(0.2, 3.2, D, 0xcfe8ff, -W/2, 1.6, zc), box(0.2, 3.2, D, 0xcfe8ff, W/2, 1.6, zc)];
     this.walls.forEach(w => this.room.add(w));
@@ -149,6 +162,14 @@ export class StoreScene {
   }
   setName(name){ this.save.storeName = name; this.sign.setText('🧸 ' + name); }
   expand(level){ this.save.expansion = level; this.buildRoom(); this.buildNav(); }
+  // 층 전환: 현재 층의 기계·손님만 보인다
+  setFloor(f){
+    if (f === this.floor) return;
+    this.customers.forEach(c => this.scene.remove(c.g)); this.wanderers.forEach(w => this.scene.remove(w.g)); this.customers = []; this.wanderers = [];
+    this.floor = f; this.buildRoom(); this.rebuildAll(); this.rebuildStaff();
+    this.sign.visible = f === 0;
+  }
+  onFloor(i){ const d = this.save.slots[i]; return !!d && (d.floor||0) === this.floor; }
 
   // ---------- 꾸미기 ----------
   applyDecor(){
@@ -174,13 +195,13 @@ export class StoreScene {
   rebuildAll(){
     this.slots.forEach(s => { if (s && s.cab) this.scene.remove(s.cab.root); });
     this.slots = [];
-    this.save.slots.forEach((data, i) => { this.slots[i] = null; if (data) this.rebuildSlot(i, true); });
+    this.save.slots.forEach((data, i) => { this.slots[i] = null; if (data && (data.floor||0) === this.floor) this.rebuildSlot(i, true); });
     this.buildNav();
   }
   rebuildSlot(i, skipNav=false){
     const data = this.save.slots[i];
     if (this.slots[i] && this.slots[i].cab) this.scene.remove(this.slots[i].cab.root);
-    if (!data){ this.slots[i] = null; if (!skipNav) this.buildNav(); return; }
+    if (!data || (data.floor||0) !== this.floor){ this.slots[i] = null; if (!skipNav) this.buildNav(); return; }
     const m = machineDef(data.machine);
     const cab = buildAnyCabinet(m);
     cab.root.position.set(data.x, 0, data.z); cab.root.rotation.y = (data.rot||0)*Math.PI/2;
@@ -238,7 +259,8 @@ export class StoreScene {
     if (rect.x0 < F.x0 || rect.x1 > F.x1 || rect.z0 < F.z0 || rect.z1 > F.z1) return false;
     const door = { x0:F.door.x0, x1:F.door.x1, z0:F.door.z0, z1:F.z1+1 };
     if (overlaps(rect, door)) return false;
-    for (let i=0;i<this.save.slots.length;i++){ const d = this.save.slots[i]; if (!d || i === ignore) continue; if (overlaps(rect, slotRect(d), 0.15)) return false; }
+    if (F.stairs && overlaps(rect, F.stairs, 0.1)) return false;
+    for (let i=0;i<this.save.slots.length;i++){ const d = this.save.slots[i]; if (!d || i === ignore || (d.floor||0) !== this.floor) continue; if (overlaps(rect, slotRect(d), 0.15)) return false; }
     return true;
   }
   pick(ndc){
@@ -246,6 +268,10 @@ export class StoreScene {
     const hits = this.raycaster.intersectObjects(this.scene.children, true);
     for (const h of hits){ if (h.object.userData.slot !== undefined) return h.object.userData.slot; if (h.object === this.floorMesh) break; }
     return null;
+  }
+  pickSign(ndc){
+    this.raycaster.setFromCamera(ndc, this.camera);
+    return this.sign.visible && this.raycaster.intersectObject(this.sign).length > 0;
   }
   pickFloor(ndc){
     this.raycaster.setFromCamera(ndc, this.camera);
@@ -273,7 +299,8 @@ export class StoreScene {
   buildNav(){
     const F = this.F, nx = Math.round((F.x1-F.x0)/GRID), nz = Math.round((F.z1-F.z0)/GRID);
     const blocked = new Uint8Array(nx*nz);
-    const rects = this.save.slots.filter(Boolean).map(d => slotRect(d));
+    const rects = this.save.slots.filter(d => d && (d.floor||0) === this.floor).map(d => slotRect(d));
+    if (F.stairs) rects.push(F.stairs);
     for (let ix=0; ix<nx; ix++) for (let iz=0; iz<nz; iz++){
       const cx = F.x0 + (ix+0.5)*GRID, cz = F.z0 + (iz+0.5)*GRID;
       if (rects.some(r => cx > r.x0-0.2 && cx < r.x1+0.2 && cz > r.z0-0.2 && cz < r.z1+0.2)) blocked[ix + iz*nx] = 1;
@@ -331,6 +358,7 @@ export class StoreScene {
   promoMult(){ const p = this.save.promo; let m = (p && p.until > Date.now()) ? p.mult : 1; if (this.hasStaff('barker')) m *= 1.25; return m; }
   rebuildStaff(){
     this.staffFigs.forEach(f => this.scene.remove(f)); this.staffFigs = [];
+    if (this.floor > 0) return;
     const F = this.F; let i = 0;
     STAFF.forEach(st => {
       if (!this.hasStaff(st.id)) return;
@@ -369,11 +397,11 @@ export class StoreScene {
     this.save.slots.forEach((data, i) => {
       if (!data) return;
       const eco = slotEconomy(data, this.save.rep, this.promoMult());
-      if (eco.facility){ if (eco.kind === 'vending'){ data.vendT = (data.vendT||0) + dt; if (data.vendT >= 10){ data.vendT = 0; const n = this.customers.length + this.wanderers.length; if (n > 0 && Math.random() < 0.6){ const inc = 1500 + 300*Math.min(n, 10); this.save.money += inc; data.stats.revenue += inc; if (visuals && this.slots[i]) this.hooks.floatText(new THREE.Vector3(data.x, 2.2, data.z), '+' + won(inc), 'money'); this.hooks.onChange(); } } } return; }
+      if (eco.facility){ if (eco.kind === 'vending'){ data.vendT = (data.vendT||0) + dt; if (data.vendT >= 10){ data.vendT = 0; const n = this.customers.length + this.wanderers.length; if (n > 0 && Math.random() < 0.6){ const inc = 1500 + 300*Math.min(n, 10); this.save.money += inc; data.stats.revenue += inc; if (visuals && this.slots[i] && this.onFloor(i)) this.hooks.floatText(new THREE.Vector3(data.x, 2.2, data.z), '+' + won(inc), 'money'); this.hooks.onChange(); } } } return; }
       if (eco.total <= 0 || eco.rate <= 0) return;
       if (Math.random() < eco.rate/60*dt && this.customers.length < 18){
         const apply = () => this.customerPlay(i);
-        if (visuals && this.slots[i]) this.spawnCustomer(i, apply); else apply();
+        if (visuals && this.slots[i] && this.onFloor(i)) this.spawnCustomer(i, apply); else apply();
       }
     });
   }
@@ -440,8 +468,32 @@ export class StoreScene {
     return g;
   }
   say(g, kind, key){
-    const pool = BUBBLES[kind]; if (!pool || !this.hooks.say) return;
-    const t = pool[Math.floor(Math.random()*pool.length)].replace(/\{item\}/g, key ? PLUSH_TYPES[key].name : '인형');
+    if (!this.hooks.say) return;
+    let pool = BUBBLES[kind], k = key;
+    if (kind === 'wander'){
+      // 실제 상황 기반: 이 층의 재고·고장·가격·붐빔·화장실
+      const here = this.save.slots.map((d,i)=>({d,i})).filter(x => x.d && (x.d.floor||0) === this.floor && machineDef(x.d.machine).type !== 'facility');
+      const stocked = here.filter(x => Object.values(x.d.stock).some(n => n > 0));
+      const broken = here.filter(x => x.d.broken);
+      const r = Math.random();
+      if (broken.length && r < 0.2) pool = BUBBLES.wanderBroken;
+      else if ((this.save.toiletDirt||0) > 15 && this.facilitySlots('toilet').length && r < 0.32) pool = BUBBLES.toiletDirty;
+      else if (!stocked.length) pool = BUBBLES.wanderEmpty;
+      else {
+        const x = stocked[Math.floor(Math.random()*stocked.length)];
+        const keys = Object.keys(x.d.stock).filter(kk => x.d.stock[kk] > 0); k = keys[Math.floor(Math.random()*keys.length)];
+        const eco = slotEconomy(x.d, this.save.rep);
+        const n = this.customers.length + this.wanderers.length;
+        if (eco.fairness < 0.25 && r < 0.6) pool = BUBBLES.wanderPricey;
+        else if (eco.fairness > 1.2 && r < 0.6) pool = BUBBLES.wanderCheap;
+        else if (n >= 12 && r < 0.75) pool = BUBBLES.wanderCrowd;
+        else if (n <= 2 && r < 0.75) pool = BUBBLES.wanderQuiet;
+        else if ((this.save.floors||1) > 1 && this.floor === 0 && r < 0.85) pool = BUBBLES.stairs;
+        else pool = BUBBLES.wanderItem;
+      }
+    }
+    if (!pool) return;
+    const t = pool[Math.floor(Math.random()*pool.length)].replace(/\{item\}/g, k ? PLUSH_TYPES[k].name : '인형');
     this.hooks.say(g, t, kind === 'angry' ? 'angry' : kind === 'win' ? 'win' : '');
   }
   addReview(kind, key, stars, machineName){
@@ -519,7 +571,7 @@ export class StoreScene {
             this.hooks.floatText(pos, '+' + won(res.price), 'money'); sfx.cash();
             if (res.win){ this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), '🎉 ' + PLUSH_TYPES[res.key].name + ' 당첨!', 'win'); this.say(cu.g, 'win', res.key); }
             else if (res.complaint || res.broken){ this.hooks.floatText(pos.clone().add(new THREE.Vector3(0,0.35,0)), res.broken ? '😡 고장 났잖아!!' : '😡 너무해!! 집게 뭐야', 'bad'); this.say(cu.g, 'angry'); }
-            else if (Math.random() < 0.45) this.say(cu.g, 'lose');
+            else if (Math.random() < 0.45){ const d = this.save.slots[cu.i]; const ks = d ? Object.keys(d.stock).filter(kk => d.stock[kk] > 0) : []; this.say(cu.g, 'lose', ks.length ? ks[Math.floor(Math.random()*ks.length)] : null); }
           }
           if (s && s.cab && s.cab.claw){ const m = machineDef(this.save.slots[cu.i]?.machine); if (m) placeClaw(s.cab, -m.w/2+CHUTE/2, m.h-0.24, m.d/2-CHUTE/2); }
           if (Math.random() < 0.4){ const w = { g:cu.g, target:null, wait:0, t:cu.t, speed:rand(0.8,1.3), leaving:false, path:null, sayT:rand(8,20) }; w.target = this.wanderTarget(w); this.wanderers.push(w); this.customers.splice(k,1); continue; }

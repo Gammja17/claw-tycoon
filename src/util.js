@@ -34,7 +34,10 @@ export function makeTextSprite(text, { size=48, color='#fff', bg='rgba(0,0,0,0.5
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true, depthTest:true }));
   sp.scale.set(width/height, 1, 1);
-  sp.setText = (t) => { draw(t); tex.needsUpdate = true; };
+  let last = text;
+  sp.setText = (t) => { last = t; draw(t); tex.needsUpdate = true; };
+  // 웹폰트가 아직 안 실렸으면 로드 뒤 다시 그린다 (대체 폰트로 굳는 것 방지)
+  if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { draw(last); tex.needsUpdate = true; });
   return sp;
 }
 function roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }

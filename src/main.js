@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAVE_KEY, WHOLESALE_INTERVAL, PROMOS, DECOR, SLOT_POS, STAFF, EXPANSIONS, BREAKDOWNS, CALLS, itemValue, makeWholesaleOffers, won } from './data.js';
+import { PLUSH_TYPES, RARITY, SHOPS, MY_MACHINES, GRIP_PRESETS, START_MONEY, SAVE_KEY, WHOLESALE_INTERVAL, PROMOS, DECOR, SLOT_POS, STAFF, EXPANSIONS, FLOOR_EXPANSIONS, BREAKDOWNS, CALLS, itemValue, makeWholesaleOffers, won } from './data.js';
 import { createMachine, BASE_H } from './machine.js';
 import { StoreScene, slotEconomy, machineDef, bdDef } from './store.js';
 import { box, lerp } from './util.js';
@@ -26,6 +26,7 @@ function loadSave(){
   if (!s.settings) s.settings = { autoStart:true, mainView:'front' };
   if (!s.staff) s.staff = {};
   if (s.expansion == null) s.expansion = 0;
+  if (!s.floors) s.floors = 1;
   return s;
 }
 const save = loadSave();
@@ -92,6 +93,8 @@ function refreshStoreHUD(){
   $('su-promo-chip').classList.toggle('hidden', !pr);
   if (pr) $('su-promo-chip').textContent = `📣 ${pr.name} ×${pr.mult} · ${Math.ceil((pr.until-Date.now())/60000)}분`;
   const broken = save.slots.filter(s => s && s.broken).length;
+  const fl = $('su-floors'); fl.classList.toggle('hidden', save.floors <= 1);
+  if (save.floors > 1 && fl.dataset.n != String(save.floors) + '-' + store.floor){ fl.dataset.n = String(save.floors) + '-' + store.floor; fl.innerHTML = ''; for (let f=0; f<save.floors; f++){ const b = document.createElement('button'); b.className = 'sm' + (store.floor === f ? '' : ' ghost'); b.textContent = `${f+1}F`; b.onclick = () => { sfx.click(); if (build.on) cancelGhost(); store.setFloor(f); refreshStoreHUD(); }; fl.appendChild(b); } }
   $('su-alert').classList.toggle('hidden', !broken);
   if (broken) $('su-alert').textContent = `⚠ 고장 ${broken}대 — 기계를 클릭해 수리`;
   if (mode === 'play') $('pu-money').textContent = won(save.money);
@@ -244,10 +247,7 @@ $('bb-rot').onclick = () => { sfx.click(); store.rotateGhost(build.moveIdx); };
 $('bb-buy').onclick = () => { sfx.click(); openBuyPanel(); };
 $('bb-decor').onclick = () => { sfx.click(); renderDecor(); openModal('m-decor'); };
 $('bb-expand').onclick = () => { sfx.click(); renderExpand(); openModal('m-expand'); };
-$('bb-name').onclick = () => {
-  const n = prompt('가게 이름을 정하세요 (12자 이내)', save.storeName);
-  if (n && n.trim()){ store.setName(n.trim().slice(0, 12)); sfx.buy(); persist(); toast(`가게 이름: ${save.storeName}`); }
-};
+$('bb-name').onclick = () => renameStore();
 const KIND_ICON = { mini:'🔬', claw:'🕹', sweet:'🍬', ufo:'🛸', pusher:'👉', toilet:'🚻', vending:'🥤', bench:'🪑' };
 function openBuyPanel(){
   const list = $('buy-list'); list.innerHTML = '';
@@ -285,6 +285,14 @@ function renderExpand(){
     if (next){ const b = document.createElement('button'); b.textContent = won(ex.price); b.disabled = save.money < ex.price; b.onclick = () => { save.money -= ex.price; store.expand(ex.level); sfx.buy(); toast(`🏗 ${ex.name} 완료! 바닥이 ${ex.w}×${ex.d}m가 됐다`); refreshStoreHUD(); renderExpand(); persist(); }; el.appendChild(b); }
     list.appendChild(el);
   });
+  const h3 = document.createElement('h3'); h3.textContent = '층 올리기'; list.appendChild(h3);
+  FLOOR_EXPANSIONS.forEach(fx => {
+    const done = save.floors >= fx.floors, next = save.floors === fx.floors - 1;
+    const el = document.createElement('div'); el.className = 'shop-card';
+    el.innerHTML = `<div class="swatch" style="background:${done ? '#dcfce7' : '#f3f0f5'}">🏢</div><div class="body"><div class="title">${fx.name} <span class="tag" style="background:#7c5cff">${fx.floors}층</span></div><div class="desc">${fx.desc} ${done ? '· 완료' : next ? '' : '· 이전 층부터'}</div></div>`;
+    if (next){ const b = document.createElement('button'); b.textContent = won(fx.price); b.disabled = save.money < fx.price; b.onclick = () => { save.money -= fx.price; save.floors = fx.floors; store.buildRoom(); store.buildNav(); sfx.buy(); toast(`🏢 ${fx.name} 완료! 상단 층 버튼으로 이동`); refreshStoreHUD(); renderExpand(); persist(); }; el.appendChild(b); }
+    list.appendChild(el);
+  });
 }
 
 // 캔버스 클릭/이동
@@ -308,7 +316,7 @@ renderer.domElement.addEventListener('pointerup', e => {
       if (build.ghostMode === 'buy'){
         const m = machineDef(g.mId); if (save.money < m.price){ toast('돈이 모자라다'); return; }
         save.money -= m.price;
-        const data = { machine:m.id, x:g.x, z:g.z, rot:g.rot, stock:{}, price:1000, grip:'normal', pity:0, pityCount:0, clawSize:1, cond:100, broken:null, stats:{plays:0,wins:0,revenue:0} };
+        const data = { machine:m.id, x:g.x, z:g.z, rot:g.rot, floor:store.floor, stock:{}, price:1000, grip:'normal', pity:0, pityCount:0, clawSize:1, cond:100, broken:null, stats:{plays:0,wins:0,revenue:0} };
         let idx = save.slots.indexOf(null); if (idx < 0){ idx = save.slots.length; } save.slots[idx] = data;
         store.rebuildSlot(idx); sfx.buy();
       } else if (build.ghostMode === 'move'){
@@ -324,10 +332,15 @@ renderer.domElement.addEventListener('pointerup', e => {
     toast('놓을 자리를 클릭. Esc로 취소');
     return;
   }
+  if (store.pickSign(ndc)){ sfx.click(); renameStore(); return; }
   const i = store.pick(ndc); if (i === null) return;
   sfx.click();
   if (save.slots[i]) openMachinePanel(i);
 });
+function renameStore(){
+  const n = prompt('가게 이름을 정하세요 (12자 이내)', save.storeName);
+  if (n && n.trim()){ store.setName(n.trim().slice(0, 12)); sfx.buy(); persist(); toast(`가게 이름: ${save.storeName}`); }
+}
 addEventListener('keydown', e => {
   if (mode === 'store' && build.on){
     if (e.key === 'r' || e.key === 'R') store.rotateGhost(build.moveIdx);
