@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PLUSH_TYPES, MY_MACHINES, CUSTOMER_WINRATE, KIND_WIN, PUSHER_WINRATE, itemValue, isPlush, REVIEWS, NICKS, DECOR, GRID, STAFF, EXPANSIONS, BREAKDOWNS, BUBBLES, won } from './data.js';
 import { buildPlushMesh } from './plush.js';
 import { buildCabinet, placeClaw, setClawOpen, footprint, BASE_H, CHUTE } from './machine.js';
-import { box, cyl, sphere, makeTextSprite, rand, lerp, clamp } from './util.js';
+import { box, cyl, sphere, makeTextSprite, makeTextPlane, rand, lerp, clamp } from './util.js';
 import { sfx } from './audio.js';
 
 const PASTELS = [0xffb3c6, 0xa0d8ff, 0xc3f0a8, 0xffe08a, 0xd9b8ff, 0xffc39a];
@@ -106,7 +106,8 @@ export class StoreScene {
     Object.assign(this.sun.shadow.camera, { left:-10, right:10, top:12, bottom:-12, near:1, far:40 });
     this.scene.add(this.sun);
     this.neonLights = []; this.room = new THREE.Group(); this.scene.add(this.room); this.tileGroup = new THREE.Group(); this.scene.add(this.tileGroup);
-    this.sign = makeTextSprite('', { size:60, color:'#ff4f8b', bg:'rgba(255,255,255,0.92)', width:900, height:180 }); this.sign.scale.set(4.5, 0.9, 1); this.sign.userData.sign = true; this.scene.add(this.sign);
+    this.sign = makeTextPlane('', { size:66, color:'#ff4f8b', bg:'rgba(255,255,255,0.96)', width:900, height:180 }); this.sign.scale.set(4.5, 0.9, 1); this.sign.userData.sign = true; this.scene.add(this.sign);
+    this.signBoard = box(4.7, 1.1, 0.08, 0xff8fab, 0, 2.6, -3.93); this.scene.add(this.signBoard);
     this.floor = 0;
     this.gridHelper = null;
     this.slots = []; this.customers = []; this.wanderers = []; this.staffFigs = []; this.navVersion = 0;
@@ -143,7 +144,7 @@ export class StoreScene {
     this.floorMesh = box(W, 0.1, D, 0xf7d9b5, 0, -0.05, zc); this.floorMesh.receiveShadow = true; this.room.add(this.floorMesh);
     this.walls = [box(W, 3.2, 0.2, 0xcfe8ff, 0, 1.6, -4.0), box(0.2, 3.2, D, 0xcfe8ff, -W/2, 1.6, zc), box(0.2, 3.2, D, 0xcfe8ff, W/2, 1.6, zc)];
     this.walls.forEach(w => this.room.add(w));
-    this.sign.position.set(0, 2.6, -3.85);
+    this.sign.position.set(0, 2.6, -3.88); this.signBoard.position.set(0, 2.6, -3.93);
     this.room.add(box(1.4, 0.06, 0.8, 0xff8fab, 0, 0.03, this.DOOR.z - 0.2));
     const mat_ = makeTextSprite('입구', { size:56, color:'#fff', bg:null }); mat_.scale.set(1, 0.25, 1); mat_.position.set(0, 0.12, this.DOOR.z - 0.2); this.room.add(mat_);
     if (this.gridHelper) this.scene.remove(this.gridHelper);
@@ -167,7 +168,7 @@ export class StoreScene {
     if (f === this.floor) return;
     this.customers.forEach(c => this.scene.remove(c.g)); this.wanderers.forEach(w => this.scene.remove(w.g)); this.customers = []; this.wanderers = [];
     this.floor = f; this.buildRoom(); this.rebuildAll(); this.rebuildStaff();
-    this.sign.visible = f === 0;
+    this.sign.visible = f === 0; this.signBoard.visible = f === 0;
   }
   onFloor(i){ const d = this.save.slots[i]; return !!d && (d.floor||0) === this.floor; }
 

@@ -19,6 +19,33 @@ export function cone(r,h,color,x=0,y=0,z=0,opts={}){
   const m = new THREE.Mesh(new THREE.ConeGeometry(r,h,8), mat(color,opts));
   m.position.set(x,y,z); m.castShadow = true; return m;
 }
+// 웹폰트를 명시적으로 로드 (숨겨진 요소만 쓰면 브라우저가 안 불러온다)
+export const fontReady = (typeof document !== 'undefined' && document.fonts) ? Promise.all([document.fonts.load('48px "Jua"'), document.fonts.load('700 16px "Noto Sans KR"')]).catch(()=>{}) : Promise.resolve();
+// 캔버스에 텍스트 그리기 (공용)
+function makeTextCanvas(text, { size=48, color='#fff', bg='rgba(0,0,0,0.55)', width=512, height=128, font='Jua, "Noto Sans KR", sans-serif' }){
+  const c = document.createElement('canvas'); c.width = width; c.height = height;
+  const g = c.getContext('2d');
+  const draw = (t) => {
+    g.clearRect(0,0,width,height);
+    if (bg){ g.fillStyle = bg; roundRect(g, 4, 4, width-8, height-8, 24); g.fill(); }
+    g.fillStyle = color; g.font = size + 'px ' + font; g.textAlign='center'; g.textBaseline='middle';
+    const lines = String(t).split('\n');
+    lines.forEach((l,i)=> g.fillText(l, width/2, height/2 + (i-(lines.length-1)/2)*size*1.15));
+  };
+  draw(text);
+  return { c, draw };
+}
+// 벽에 붙는 평면 간판 (빌보드가 아니라 기울어도 벽에 묻히지 않음)
+export function makeTextPlane(text, opts={}){
+  const { width=900, height=180 } = opts;
+  const { c, draw } = makeTextCanvas(text, { width, height, ...opts });
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(width/height, 1), new THREE.MeshBasicMaterial({ map:tex, transparent:true }));
+  let last = text;
+  m.setText = (t) => { last = t; draw(t); tex.needsUpdate = true; };
+  fontReady.then(() => { draw(last); tex.needsUpdate = true; });
+  return m;
+}
 // 캔버스 텍스트 스프라이트 (라벨/디스플레이용)
 export function makeTextSprite(text, { size=48, color='#fff', bg='rgba(0,0,0,0.55)', width=512, height=128, font='Jua, sans-serif' }={}){
   const c = document.createElement('canvas'); c.width = width; c.height = height;
@@ -37,7 +64,7 @@ export function makeTextSprite(text, { size=48, color='#fff', bg='rgba(0,0,0,0.5
   let last = text;
   sp.setText = (t) => { last = t; draw(t); tex.needsUpdate = true; };
   // 웹폰트가 아직 안 실렸으면 로드 뒤 다시 그린다 (대체 폰트로 굳는 것 방지)
-  if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { draw(last); tex.needsUpdate = true; });
+  fontReady.then(() => { draw(last); tex.needsUpdate = true; });
   return sp;
 }
 function roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
