@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PLUSH_TYPES, MY_MACHINES, CUSTOMER_WINRATE, KIND_WIN, PUSHER_WINRATE, itemValue, isPlush, REVIEWS, NICKS, PERSONAS, DECOR, GRID, STAFF, EXPANSIONS, BREAKDOWNS, BUBBLES, won } from './data.js';
 import { buildPlushMesh } from './plush.js';
 import { buildCabinet, placeClaw, setClawOpen, footprint, BASE_H, CHUTE } from './machine.js';
-import { box, cyl, sphere, makeTextSprite, makeTextPlane, rand, lerp, clamp } from './util.js';
+import { box, cyl, sphere, makeTextSprite, rand, lerp, clamp } from './util.js';
 import { sfx } from './audio.js';
 import { spawn, play as playAnim, tick as tickAnim, fitHeight, CHARACTERS } from './assets.js';
 
@@ -110,8 +110,8 @@ export class StoreScene {
     Object.assign(this.sun.shadow.camera, { left:-10, right:10, top:12, bottom:-12, near:1, far:40 });
     this.scene.add(this.sun);
     this.neonLights = []; this.room = new THREE.Group(); this.scene.add(this.room); this.tileGroup = new THREE.Group(); this.scene.add(this.tileGroup); this.props = new THREE.Group(); this.scene.add(this.props); this.propRects = [];
-    this.sign = makeTextPlane('', { size:66, color:'#ff4f8b', bg:'rgba(255,255,255,0.96)', width:900, height:180 }); this.sign.scale.set(0.9, 0.9, 1); this.sign.userData.sign = true; this.scene.add(this.sign);
-    this.signBoard = box(4.7, 1.1, 0.08, 0xff8fab, 0, 2.6, -3.93); this.scene.add(this.signBoard);
+    // 가게 이름: 뒷벽 위에 떠 있는 UI 느낌의 스프라이트 (클릭하면 이름 변경)
+    this.sign = makeTextSprite('', { size:64, color:'#ff4f8b', bg:'rgba(255,255,255,0.94)', width:1024, height:160 }); this.sign.scale.set(4.8, 0.75, 1); this.sign.userData.sign = true; this.scene.add(this.sign);
     this.floor = 0;
     this.gridHelper = null;
     this.slots = []; this.customers = []; this.wanderers = []; this.staffFigs = []; this.navVersion = 0;
@@ -149,17 +149,16 @@ export class StoreScene {
     this.floorMesh = box(W, 0.1, D, 0xf7d9b5, 0, -0.05, zc); this.floorMesh.receiveShadow = true; this.room.add(this.floorMesh);
     this.walls = [box(W, 3.2, 0.2, 0xcfe8ff, 0, 1.6, -4.0), box(0.2, 3.2, D, 0xcfe8ff, -W/2, 1.6, zc), box(0.2, 3.2, D, 0xcfe8ff, W/2, 1.6, zc)];
     this.walls.forEach(w => this.room.add(w));
-    this.sign.position.set(0, 2.6, -3.88); this.signBoard.position.set(0, 2.6, -3.93);
+    this.sign.position.set(0, 3.55, -4.0);
     this.room.add(box(1.4, 0.06, 0.8, 0xff8fab, 0, 0.03, this.DOOR.z - 0.2));
     this.frontDoor = null;
     if (this.floor === 0){
       // 앞 유리벽 + 여닫이 문 (문은 x=-0.6 경첩에서 안쪽으로 열림)
       const fz = this.F.z1 + 0.7, gw = (W - 1.3)/2;
-      const glassMat = new THREE.MeshPhysicalMaterial({ color:0xbfe4ff, transparent:true, opacity:0.28, roughness:0.15, metalness:0, side:THREE.DoubleSide });
+      const glassMat = new THREE.MeshPhysicalMaterial({ color:0xbfe4ff, transparent:true, opacity:0.12, roughness:0.15, metalness:0, side:THREE.DoubleSide });
       [-1, 1].forEach(sg => { const g = new THREE.Mesh(new THREE.BoxGeometry(gw, 2.6, 0.06), glassMat); g.position.set(sg*(0.65 + gw/2), 1.3, fz); this.room.add(g); this.room.add(box(gw, 0.12, 0.14, 0x8a7f92, sg*(0.65 + gw/2), 0.06, fz)); this.room.add(box(gw, 0.12, 0.14, 0x8a7f92, sg*(0.65 + gw/2), 2.6, fz)); });
-      this.room.add(box(W, 0.5, 0.16, 0xff8fab, 0, 2.85, fz)); // 캐노피 띠
       const door = new THREE.Group(); door.position.set(-0.6, 0, fz); this.room.add(door);
-      const dg = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.5, 0.05), glassMat.clone()); dg.material.opacity = 0.4; dg.position.set(0.6, 1.25, 0); door.add(dg);
+      const dg = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.5, 0.05), glassMat.clone()); dg.material.opacity = 0.2; dg.position.set(0.6, 1.25, 0); door.add(dg);
       door.add(box(1.2, 0.08, 0.07, 0x8a7f92, 0.6, 2.5, 0)); door.add(box(1.2, 0.08, 0.07, 0x8a7f92, 0.6, 0.04, 0)); door.add(box(0.06, 2.5, 0.07, 0x8a7f92, 1.17, 1.25, 0)); door.add(box(0.06, 2.5, 0.07, 0x8a7f92, 0.03, 1.25, 0));
       door.add(box(0.04, 0.5, 0.04, 0xffd400, 1.0, 1.1, 0.06)); door.add(box(0.04, 0.5, 0.04, 0xffd400, 1.0, 1.1, -0.06));
       this.frontDoor = door; this.doorOpen = 0;
@@ -189,7 +188,6 @@ export class StoreScene {
       const pz = put('arcade-prizes', cx + 0.6, cz, 0.5); if (pz) pz.position.y = 1.0;
       this.propRects.push({ x0:cx-1.4, x1:cx+1.4, z0:F.z0-0.2, z1:cz+0.5 });
       // 기둥(뒤쪽 양 끝), 화분(입구 양쪽), 쓰레기통
-      put('arcade-column', F.x0 + 0.35, F.z0 + 0.35, 3.0); put('arcade-column', F.x1 - 0.35, F.z0 + 0.35, 3.0);
       put('furn-plantSmall1', -1.6, F.z1 - 0.4, 0.9); put('furn-plantSmall2', 1.6, F.z1 - 0.4, 0.9);
       put('furn-lampRoundFloor', F.x1 - 0.5, F.z1 - 0.6, 1.6);
     } else {
@@ -292,7 +290,7 @@ export class StoreScene {
   panBy(dx, dy){ const c = this.cam; const k = 0.011 * c.zoom; const ca = Math.cos(c.yaw), sa = Math.sin(c.yaw); const mx = -dx*k, mz = -dy*k; c.tx += mx*ca + mz*sa; c.tz += -mx*sa + mz*ca; const F = this.F; c.tx = clamp(c.tx, F.x0-6, F.x1+6); c.tz = clamp(c.tz, F.z0-6, F.z1+8); this.updateCamera(); }
   rotateBy(dx){ this.cam.yaw += dx*0.006; this.updateCamera(); }
   zoomBy(f){ this.cam.zoom = clamp(this.cam.zoom * f, 0.35, 2.6); this.updateCamera(); }
-  resetCamera(){ const ex = EXPANSIONS[this.level] || EXPANSIONS[0]; this.cam = { tx:0, tz:-4 + ex.d/2 - 0.6, zoom:1, yaw:0 }; this.updateCamera(); }
+  resetCamera(){ const ex = EXPANSIONS[this.level] || EXPANSIONS[0]; this.cam = { tx:0, tz:-4 + ex.d/2 - 1.3, zoom:1, yaw:0 }; this.updateCamera(); }
   updateCamera(){
     const ex = EXPANSIONS[this.level] || EXPANSIONS[0]; const sz = Math.max(ex.w/11, ex.d/9);
     const s = clamp(0.78 + 0.32*this.aspect, 1.0, 1.4) * sz * this.cam.zoom;
@@ -311,7 +309,7 @@ export class StoreScene {
     if (f === this.floor) return;
     this.customers.forEach(c => this.scene.remove(c.g)); this.wanderers.forEach(w => this.scene.remove(w.g)); this.customers = []; this.wanderers = [];
     this.floor = f; this.buildRoom(); this.rebuildAll(); this.rebuildStaff();
-    this.sign.visible = f === 0; this.signBoard.visible = f === 0;
+    this.sign.visible = f === 0;
   }
   onFloor(i){ const d = this.save.slots[i]; return !!d && (d.floor||0) === this.floor; }
 
