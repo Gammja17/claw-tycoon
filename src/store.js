@@ -490,7 +490,7 @@ export class StoreScene {
     if (!mv.path || mv.navV !== this.navVersion){ mv.path = this.findPath(mv.g.position, mv.target); mv.navV = this.navVersion; }
     const dst = mv.path[0];
     const dir = dst.clone().sub(mv.g.position); dir.y = 0; const dist = dir.length();
-    const tol = mv.outside ? 0.35 : (mv.path.length === 1 && (mv.leaving || mv.phase === 'out')) ? 0.3 : 0.06;   // 나갈 때는 문 근처에서 느슨하게 (밀려서 못 닿는 정체 방지)
+    const tol = mv.outside ? 0.35 : (mv.path.length === 1 && (mv.leaving || mv.phase === 'out' || mv.phase === 'in')) ? 0.28 : 0.06;   // 나갈 때는 문 근처에서 느슨하게 (밀려서 못 닿는 정체 방지)
     if (dist < tol){ mv.path.shift(); if (!mv.path.length){
         if (mv.outside === 'in'){ mv.outside = null; mv.path = null; return false; }        // 문 앞 도착 → 안쪽 목표로 내비
         if (mv.outside === 'leave'){ mv.outside = 'gone'; return true; }
@@ -574,7 +574,8 @@ export class StoreScene {
       if (eco.total <= 0 || eco.rate <= 0) return;
       if (Math.random() < eco.rate/60*dt && this.customers.length < 18){
         const apply = () => this.customerPlay(i);
-        if (visuals && this.slots[i] && this.onFloor(i)) this.spawnCustomer(i, apply); else apply();
+        const queued = this.customers.filter(c => c.i === i && c.phase !== 'out').length;
+        if (visuals && this.slots[i] && this.onFloor(i) && queued < 2 && this.customers.length < 8) this.spawnCustomer(i, apply); else apply();
       }
     });
   }
@@ -714,7 +715,8 @@ export class StoreScene {
   updateWanderers(dt){
     const machines = this.save.slots.filter(d => d && machineDef(d.machine).type !== 'facility').length;
     const benches = this.facilitySlots('bench').length;
-    const want = machines === 0 ? 0 : Math.min(20, Math.round((1 + machines*1.5 + (this.save.rep ?? 3)*1.2 + benches*2) * Math.min(1.8, this.promoMult())));
+    const cap = Math.max(3, Math.min(10, Math.round(this.F.W * this.F.D / 14)));
+    const want = machines === 0 ? 0 : Math.min(cap, Math.round((1 + machines*1.5 + (this.save.rep ?? 3)*1.2 + benches*2) * Math.min(1.8, this.promoMult())));
     this.wanderT = (this.wanderT || 0) + dt;
     if (this.wanderers.length < want && this.wanderT > 1.4){ this.wanderT = 0; const w = { g:this.makePerson(), target:null, wait:0, t:rand(0,10), speed:rand(0.8, 1.3), leaving:false, path:null, sayT:rand(5,20) }; w.target = this.wanderTarget(w); this.enterFromOutside(w); this.wanderers.push(w); }
     if (this.wanderers.length > want && this.wanderT > 0.8){ this.wanderT = 0; const w = this.wanderers.find(x => !x.leaving && !x.visit); if (w){ w.leaving = true; w.target = this.DOOR.clone(); w.path = null; w.wait = 0; } }
