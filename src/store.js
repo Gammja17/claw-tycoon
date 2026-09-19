@@ -50,7 +50,7 @@ export function buildGacha(spec){
   const display = makeTextSprite('0원', { size:54, color:'#ff3a3a', bg:null, width:512, height:128 });
   display.scale.set(0.34, 0.085, 1); display.position.set(0, 0.2, d/2+0.02); root.add(display);
   const sign = makeTextSprite(spec.name, { size:60, color:'#ff4f8b', bg:null, width:640, height:128 });
-  sign.scale.set(1.0, 0.2, 1); sign.position.set(0, 0.8 + w*1.05, 0); root.add(sign);
+  sign.scale.set(1.0, 0.2, 1); sign.position.set(0, 0.8 + w*1.05, 0);
   return { root, interior, display, sign, lights:[], dims:{w,d,h}, isGacha:true, globeR:w*0.48 };
 }
 // 시설물
@@ -239,15 +239,14 @@ export class StoreScene {
     if (kind === 'ufo'){ keys.slice(0,6).forEach((k, j) => { const mesh = buildPlushMesh(k); mesh.position.set(-m.w/2+0.3 + j*0.22, 0.4, 0); mesh.rotation.x = Math.PI/2; s.cab.interior.add(mesh); s.plushMeshes.push(mesh); }); }
     else if (kind === 'pusher'){ keys.slice(0,6).forEach((k, j) => { const mesh = buildPlushMesh(k); mesh.position.set(-m.w/2+0.25 + j*0.25, 0.48, -m.d/2+0.42); s.cab.interior.add(mesh); s.plushMeshes.push(mesh); }); }
     else {
-      const x0 = kind === 'sweet' ? -m.w/2 + 0.7 : -m.w/2 + 0.2;
-      const cols = Math.max(2, Math.floor((m.w/2 - x0 + m.w/2 - 0.1)/0.3));
+      const x0 = kind === 'sweet' ? -m.w/2 + 0.7 : -m.w/2 + 0.2, x1 = m.w/2 - 0.2, z0 = -m.d/2 + 0.2, z1 = m.d/2 - 0.2;
+      const cols = Math.max(1, Math.floor((x1 - x0)/0.28) + 1), rows = Math.max(1, Math.floor((z1 - z0)/0.28) + 1);
       keys.forEach((k, j) => {
         const mesh = buildPlushMesh(k);
         const col = j % cols, row = Math.floor(j/cols);
-        const rows = Math.max(1, Math.floor((m.d-0.2)/0.3));
         const layer = Math.floor(row / rows), r2 = row % rows;
-        let x = x0 + col*0.3 + rand(-0.03,0.03), z = -m.d/2 + 0.2 + r2*0.3 + rand(-0.03,0.03);
-        if (kind !== 'sweet' && x < -m.w/2+CHUTE+0.1 && z > m.d/2-CHUTE-0.1) z -= CHUTE;
+        let x = clamp(x0 + col*0.28 + rand(-0.03,0.03), x0, x1), z = clamp(z0 + r2*0.28 + rand(-0.03,0.03), z0, z1);
+        if (kind !== 'sweet' && x < -m.w/2+CHUTE+0.1 && z > m.d/2-CHUTE-0.1) z = Math.max(z0, z - CHUTE);
         mesh.position.set(x, 0.14 + layer*0.28, z); mesh.rotation.y = rand(0, Math.PI*2);
         s.cab.interior.add(mesh); s.plushMeshes.push(mesh);
       });

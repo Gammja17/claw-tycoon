@@ -155,7 +155,7 @@ function buildClawCabinet(spec, style){
     for (let i=0;i<7;i++){ const c = [0xff5c8a, 0xffd34d, 0x5ce1ff, 0x9dff6b][i%4]; const l = sphere(0.03, c, -w/2-TRIM+0.1 + i*(w+2*TRIM-0.2)/6, h+0.44, d/2+TRIM-0.04, 1,1,1, { emissive:c, emissiveIntensity:1 }); lights.push(l); interior.add(l); }
   }
   const sign = makeTextSprite(spec.name, { size:60, color: style==='ufo' ? '#ff5c8a' : '#ff4f8b', bg:null, width:640, height:128 });
-  sign.scale.set(Math.min(w+0.1, 1.6), 0.32, 1); sign.position.set(0, h + (style==='mini' ? 0.18 : 0.29), d/2+TRIM+0.01); interior.add(sign);
+  sign.scale.set(Math.min(w+0.1, 1.6), 0.32, 1); sign.position.set(0, h + (style==='mini' ? 0.18 : 0.29), d/2+TRIM+0.01); // 이름표는 표시하지 않음
   // 레일 + 캐리지
   const railY = h-0.09;
   interior.add(box(0.05, 0.05, d, 0x555566, -w/2+0.04, railY, 0));
@@ -210,7 +210,7 @@ function buildPusherCabinet(spec){
   interior.add(box(w+2*TRIM, 0.16, d+2*TRIM, color, 0, h+0.08, 0));
   interior.add(box(w+2*TRIM, 0.26, 0.08, 0xffffff, 0, h+0.29, d/2+TRIM-0.04));
   const sign = makeTextSprite(spec.name, { size:60, color:'#ff4f8b', bg:null, width:640, height:128 });
-  sign.scale.set(Math.min(w+0.1, 1.6), 0.32, 1); sign.position.set(0, h+0.29, d/2+TRIM+0.01); interior.add(sign);
+  sign.scale.set(Math.min(w+0.1, 1.6), 0.32, 1); sign.position.set(0, h+0.29, d/2+TRIM+0.01);
   const lights = [];
   for (let i=0;i<7;i++){ const c = [0x5ce1ff, 0xffd34d][i%2]; const l = sphere(0.03, c, -w/2-TRIM+0.1 + i*(w+2*TRIM-0.2)/6, h+0.44, d/2+TRIM-0.04, 1,1,1, { emissive:c, emissiveIntensity:1 }); lights.push(l); interior.add(l); }
   // 막대 레일(뒤쪽 위) + 막대
