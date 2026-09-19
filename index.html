@@ -50,6 +50,13 @@
   #dpad button { font-size:22px; padding:0; border-radius:12px; background:rgba(255,255,255,.9); color:var(--pink); box-shadow:0 3px 0 #e6c4d0; touch-action:none; user-select:none; }
   #pu-drop { position:fixed; right:18px; bottom:18px; width:120px; height:120px; border-radius:50%; font-size:22px; background:#ffd400; color:#5a3a00; box-shadow:0 6px 0 #c9a600; }
   #pu-drop:active { box-shadow:0 2px 0 #c9a600; }
+  #build-bar { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; z-index:5; }
+  #pu-hint { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:rgba(59,42,58,.85); color:#fff; padding:6px 12px; border-radius:10px; font-size:13px; max-width:80vw; text-align:center; pointer-events:none; }
+  #pu-hint:empty { display:none; }
+  .decor-card { display:flex; align-items:center; gap:10px; background:#fff; border-radius:12px; padding:8px 12px; }
+  .decor-card .sw { width:36px; height:36px; border-radius:8px; border:2px solid rgba(0,0,0,.1); flex:none; }
+  .decor-card .name { flex:1; }
+  .decor-card.on { outline:3px solid var(--pink); }
   #keys { position:fixed; bottom:206px; left:18px; font-size:12px; color:#7a5a6a; background:rgba(255,255,255,.7); border-radius:10px; padding:6px 10px; }
   .float { position:fixed; transform:translate(-50%,-50%); font-size:20px; color:#1f9d55; text-shadow:0 2px 0 #fff, 0 0 8px #fff; pointer-events:none; animation:floatUp 1.6s ease-out forwards; white-space:nowrap; }
   .float.win { color:var(--pink); font-size:22px; }
@@ -80,9 +87,31 @@
     <button class="ghost" id="su-whole">🚚 도매</button>
     <button class="ghost" id="su-promo">📣 홍보</button>
     <button class="ghost" id="su-reviews">💬 리뷰</button>
+    <button class="ghost" id="su-build">🔨 건축</button>
     <button class="ghost" id="su-inv">📦 창고</button>
     <button class="ghost" id="su-help">❓</button>
   </div>
+</div>
+
+<!-- 건축 모드 툴바 -->
+<div id="build-bar" class="hidden">
+  <span class="chip">🔨 건축 모드 · 바닥을 클릭해 배치, 기계를 클릭해 이동</span>
+  <button id="bb-buy">🛒 기계 구매</button>
+  <button class="ghost" id="bb-decor">🎨 바닥·벽·조명</button>
+  <button class="ghost" id="bb-name">✏️ 가게 이름</button>
+  <button class="ghost" id="bb-rot">🔄 회전 (R)</button>
+  <button class="ghost" id="bb-cancel">↩ 취소 (Esc)</button>
+  <button id="bb-done">✅ 완료</button>
+</div>
+
+<!-- 꾸미기 -->
+<div id="m-decor" class="modal hidden">
+  <button class="close">✕</button>
+  <h2>🎨 가게 꾸미기</h2>
+  <div class="hint">한 번 사면 계속 쓸 수 있다. 손님 눈에도 보인다(평점 소폭 보너스).</div>
+  <h3>바닥</h3><div id="decor-floor" class="list"></div>
+  <h3>벽</h3><div id="decor-wall" class="list"></div>
+  <h3>조명</h3><div id="decor-light" class="list"></div>
 </div>
 
 <!-- 플레이 화면 UI -->
@@ -92,7 +121,8 @@
     <div class="chip" id="pu-shop">가게</div>
     <div class="chip" id="pu-credit">크레딧 0</div>
     <div class="spacer"></div>
-    <button class="ghost" id="pu-cam">📷 시점</button>
+    <label class="chip" style="font-size:14px;cursor:pointer"><input type="checkbox" id="pu-auto" checked> 자동 시작</label>
+    <button class="ghost" id="pu-cam">🔁 시점 바꾸기 (C)</button>
     <button class="ghost" id="pu-exit">🏠 내 가게로</button>
   </div>
   <div id="pu-desc"></div>
@@ -101,8 +131,10 @@
   <div class="bottombar">
     <button id="pu-coin">💰 500원 넣기</button>
     <button id="pu-start">▶ 시작</button>
+    <button class="ghost hidden" id="pu-skip">⏭ 다음 판</button>
   </div>
-  <div id="keys">방향키/WASD 이동 · 스페이스 내리기 · C 시점</div>
+  <div id="pu-hint"></div>
+  <div id="keys">방향키/WASD 이동 · 스페이스 내리기 · C 시점 바꾸기</div>
   <div id="dpad">
     <span></span><button data-k="up">▲</button><span></span>
     <button data-k="left">◀</button><span></span><button data-k="right">▶</button>

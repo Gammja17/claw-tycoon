@@ -57,27 +57,68 @@ export const SHOPS = [
     grip:'strong', pity:0, clawSize:1.0, swing:0.35, pool:['panda','unicorn','penguin','dragon'], count:14, color:0xffb36b, w:1.7,d:1.3,h:1.85 },
   { id:'apple', name:'애플 뽑기 (합법)', cost:5000, desc:'에어팟·애플워치·아이패드. 아이패드는 납작해서 손가락이 못 들어간다. 밀어서 떨어뜨리는 게 정석.',
     grip:'normal', pity:0, clawSize:1.0, swing:0.35, pool:['keyring','airpods','watch','ipad'], weights:[5,2.2,2,1.3], count:14, color:0xe8e8ec, w:1.7,d:1.3,h:1.75 },
+  { id:'mini', name:'미니 크레인 (300원)', cost:300, kind:'mini', desc:'탁자 위 초소형 크레인. 집게가 콩알만 하다. 키링·말랑이·오리 전용.',
+    grip:'normal', pity:0, clawSize:0.55, swing:0.4, pool:['keyring','squishy','duck'], weights:[4,3,2], count:12, color:0xa0e7ff, w:0.75,d:0.6,h:0.75 },
+  { id:'sweet', name:'스위트박스 (2단 밀판)', cost:1000, kind:'sweet', desc:'왼쪽 2단 선반의 윗판이 앞뒤로 왕복한다. 집게로 인형을 집어 판 위에 올려두면 판이 밀어서 앞 구덩이로 떨어뜨린다. 한 판에 못 뽑아도 쌓아두는 게 전략.',
+    grip:'normal', pity:0, clawSize:1.0, swing:0.35, pool:['bear','bunny','duck','cat','frog','squishy'], count:18, color:0xff8fab, w:1.9,d:1.3,h:1.75 },
+  { id:'ufo', name:'UFO 캐처 (橋渡し)', cost:2000, kind:'ufo', desc:'일본식 2발 집게. 버튼 1회차: 누르는 동안 오른쪽, 2회차: 누르는 동안 안쪽. 상품 박스가 두 봉 위에 얹혀 있고 봉 끝(오른쪽)까지 밀어 떨어뜨리면 획득.',
+    grip:'normal', pity:0, clawSize:1.1, swing:0.35, pool:['figure','figure','airpods'], weights:[4,4,1], count:6, color:0xff5c8a, w:1.7,d:1.2,h:1.75 },
+  { id:'pusher', name:'푸시 캐처 (밀어뽑기)', cost:1000, kind:'pusher', desc:'선반 위 상품을 막대로 한 판에 7cm씩 민다. 떨어질 때까지 6~8판. 누가 밀어놓은 상품을 가로채는 게 꿀.',
+    grip:'normal', pity:0, clawSize:1.0, swing:0.35, pool:['figure','watch','airpods'], weights:[5,1,2], count:6, color:0x8fd3ff, w:1.6,d:1.2,h:1.6 },
   { id:'legend', name:'전설의 황금기계', cost:5000, desc:'느슨한데 20판 피티가 있다는 소문. 황금곰이 산다.',
     grip:'loose', pity:20, clawSize:1.1, swing:0.35, pool:['panda','unicorn','dragon','goldbear'], count:10, color:0xffd166, w:1.8,d:1.4,h:1.85 },
 ];
 
 // 내 가게에서 살 수 있는 기계. type: claw(인형뽑기) / gacha(랜덤 뽑기, 손님은 무조건 하나 받아감)
 export const MY_MACHINES = [
-  { id:'small', name:'소형 크레인', type:'claw', price:40000,  capacity:8,  baseRate:8,  color:0xffa4c4, w:1.3,d:1.0,h:1.2 },
-  { id:'mid',   name:'중형 크레인', type:'claw', price:120000, capacity:14, baseRate:12, color:0x8fd3ff, w:1.6,d:1.2,h:1.4 },
-  { id:'big',   name:'대형 크레인', type:'claw', price:350000, capacity:24, baseRate:18, color:0xffe08a, w:1.9,d:1.4,h:1.6 },
+  { id:'mini',  name:'미니 크레인', type:'claw', kind:'mini', price:25000, capacity:6, baseRate:7, color:0xa0e7ff, w:0.75,d:0.6,h:0.75, desc:'탁자 위 초소형. 키링·말랑이용. 자리 적게 차지.' },
+  { id:'small', name:'소형 크레인', type:'claw', kind:'claw', price:40000,  capacity:8,  baseRate:8,  color:0xffa4c4, w:1.3,d:1.0,h:1.2 },
+  { id:'mid',   name:'중형 크레인', type:'claw', kind:'claw', price:120000, capacity:14, baseRate:12, color:0x8fd3ff, w:1.6,d:1.2,h:1.4 },
+  { id:'big',   name:'대형 크레인', type:'claw', kind:'claw', price:350000, capacity:24, baseRate:18, color:0xffe08a, w:1.9,d:1.4,h:1.6 },
+  { id:'sweet', name:'스위트박스 크레인', type:'claw', kind:'sweet', price:280000, capacity:20, baseRate:16, color:0xff8fab, w:1.9,d:1.3,h:1.75, desc:'2단 밀판. 손님이 쌓아두고 가서 다음 손님이 뽑는 구조라 회전이 빠르다.' },
+  { id:'ufo',   name:'UFO 캐처',     type:'claw', kind:'ufo', price:260000, capacity:6, baseRate:9, color:0xff5c8a, w:1.7,d:1.2,h:1.75, desc:'박스 상품 전용(피규어·전자기기). 고급 손님이 온다.' },
+  { id:'pusher',name:'푸시 캐처',    type:'claw', kind:'pusher', price:180000, capacity:6, baseRate:11, color:0x8fd3ff, w:1.6,d:1.2,h:1.6, desc:'박스 상품을 밀어서 떨어뜨림. 당첨률은 낮지만 손님이 연속으로 돈을 쓴다.' },
   { id:'gacha', name:'가챠 머신',   type:'gacha', price:60000, capacity:30, baseRate:10, color:0xff8fab, w:0.9,d:0.9,h:1.3, desc:'넣어둔 상품 중 하나가 무조건 나온다. 재고 처리용. 가격을 평균 시세보다 낮게 두면 손님이 몰린다.' },
 ];
 // 손님이 이길 확률(집게 세팅별). 작은 집게면 ×0.6
 export const CUSTOMER_WINRATE = { loose:0.05, normal:0.13, strong:0.32 };
+// 기계 종류별 당첨률 배율 (푸시 캐처는 집게 힘 무관 고정)
+export const KIND_WIN = { claw:1, mini:1, sweet:1.5, ufo:0.8, pusher:null };
+export const PUSHER_WINRATE = 1/6;
 // 도매 시장: 10분마다 일반/고급 상품 입고 (희귀·전설은 원정 전용)
 export const WHOLESALE_INTERVAL = 10*60*1000;
 export function makeWholesaleOffers(){
   const keys = Object.keys(PLUSH_TYPES).filter(k => PLUSH_TYPES[k].rarity <= 1);
   const pick = [...keys].sort(() => Math.random()-0.5).slice(0, 4);
-  return pick.map(k => { const r = PLUSH_TYPES[k].rarity; return { key:k, qty: r===0 ? 4+Math.floor(Math.random()*4) : 2+Math.floor(Math.random()*3), price: Math.round(itemValue(k)*(r===0?0.7:0.8)/100)*100 }; });
+  return pick.map(k => { const r = PLUSH_TYPES[k].rarity; return { key:k, qty: r===0 ? 16+Math.floor(Math.random()*16) : 8+Math.floor(Math.random()*10), price: Math.round(itemValue(k)*(r===0?0.7:0.8)/100)*100 }; });
 }
 export const SLOT_POS = [[-2.7,-1.7],[0,-1.7],[2.7,-1.7],[-2.7,1.1],[0,1.1],[2.7,1.1]];
+export const FLOOR = { x0:-5.25, x1:5.25, z0:-3.75, z1:4.15, door:{ x0:-1.0, x1:1.0, z0:3.3 } };
+export const GRID = 0.5;
+
+// 가게 꾸미기 (한 번 사면 계속 쓸 수 있음)
+export const DECOR = {
+  floor: [
+    { id:'tile',   name:'체크 타일',  price:0,      base:0xf7d9b5, tile:0xfbe4c8, pattern:'checker' },
+    { id:'wood',   name:'원목 마루',  price:150000, base:0xd9a066, tile:0xc98d55, pattern:'plank' },
+    { id:'marble', name:'대리석',     price:400000, base:0xf3f3f6, tile:0xe6e6ec, pattern:'checker' },
+    { id:'carpet', name:'오락실 카펫', price:250000, base:0x2b2f6b, tile:0x4a3fa8, pattern:'checker' },
+    { id:'grass',  name:'잔디 매트',  price:120000, base:0x9fd68f, tile:0x8cc97d, pattern:'plain' },
+  ],
+  wall: [
+    { id:'sky',   name:'하늘색 벽',   price:0,      color:0xcfe8ff },
+    { id:'pink',  name:'핑크 벽',     price:80000,  color:0xffd1e0 },
+    { id:'mint',  name:'민트 벽',     price:80000,  color:0xc8f2e0 },
+    { id:'brick', name:'붉은 벽돌',   price:200000, color:0xb8624a },
+    { id:'dark',  name:'네온 다크',   price:300000, color:0x2a2438 },
+  ],
+  light: [
+    { id:'day',   name:'밝은 낮',     price:0,      hemi:0xffffff, ground:0xffc0cb, sun:0xffffff, sunI:1.4, hemiI:0.9, bg:0xffe9f0, neon:[] },
+    { id:'warm',  name:'따뜻한 조명', price:100000, hemi:0xfff0d0, ground:0xffb080, sun:0xffd9a0, sunI:1.2, hemiI:0.8, bg:0xffe4cf, neon:[] },
+    { id:'neon',  name:'네온 오락실', price:350000, hemi:0x8877ff, ground:0x442266, sun:0xffffff, sunI:0.5, hemiI:0.5, bg:0x1a1430, neon:[0xff2d95, 0x2dffec, 0xffe12d, 0xa12dff] },
+    { id:'night', name:'심야 영업',   price:200000, hemi:0x6677aa, ground:0x223355, sun:0x99aaff, sunI:0.6, hemiI:0.6, bg:0x101a33, neon:[0xffd166] },
+  ],
+};
 
 // 홍보
 export const PROMOS = [
